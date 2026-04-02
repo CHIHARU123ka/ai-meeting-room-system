@@ -1,0 +1,10 @@
+.env
+.env.local
+node_modules/
+.next/
+__pycache__/
+*.pyc
+logs/
+ai-meeting-room/node_modules/
+ai-meeting-room/.next/
+ai-meeting-room/.env.local

@@ -36,7 +36,7 @@ def send_ntfy(title: str, body: str, priority: str = "default", tags: str = "rob
         url = f"https://ntfy.sh/{NTFY_TOPIC}"
         data = body.encode("utf-8")
         req = urllib.request.Request(url, data=data, method="POST")
-        req.add_header("Title", title)
+        req.add_header("Title", title.encode("utf-8").decode("latin-1"))
         req.add_header("Priority", priority)
         req.add_header("Tags", tags)
         req.add_header("Content-Type", "text/plain; charset=utf-8")
