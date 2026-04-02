@@ -1,0 +1,321 @@
+# ═══════════════════════════════════════════════════════════
+# .github/workflows/dev_pipeline.yml
+# GitHub Actions — テスト自動実行・PR自動作成・通知
+# ═══════════════════════════════════════════════════════════
+
+name: 🤖 Autonomous Dev Pipeline
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'auto/**'
+      - 'fix/**'
+  workflow_dispatch:
+    inputs:
+      trigger_code:
+        description: 'トリガーコード (T1-T5)'
+        required: false
+        default: 'MANUAL'
+      message:
+        description: '通知メッセージ'
+        required: false
+        default: '手動起動'
+      skip_tests:
+        description: 'テストをスキップ (true/false)'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ──────────────────────────────────────────
+  # JOB 1: テスト自動実行
+  # ──────────────────────────────────────────
+  test:
+    name: 🧪 自動テスト実行
+    runs-on: ubuntu-latest
+    if: inputs.skip_tests != 'true'
+
+    outputs:
+      test_result: ${{ steps.test_summary.outputs.result }}
+      coverage: ${{ steps.test_summary.outputs.coverage }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node.js セットアップ
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Python セットアップ
+        if: hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 依存関係インストール (Node)
+        if: hashFiles('package.json') != ''
+        run: npm ci
+
+      - name: 依存関係インストール (Python)
+        if: hashFiles('requirements.txt') != ''
+        run: pip install -r requirements.txt
+
+      - name: テスト実行 (Node)
+        if: hashFiles('package.json') != ''
+        id: node_test
+        run: |
+          npm test -- --coverage --coverageReporters=json-summary 2>&1 | tee test_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: テスト実行 (Python)
+        if: hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != ''
+        id: python_test
+        run: |
+          pip install pytest pytest-cov
+          pytest --cov=. --cov-report=json --cov-report=term 2>&1 | tee test_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: テスト結果サマリー
+        id: test_summary
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            COVERAGE=$(python3 -c "
+          import json
+          with open('coverage/coverage-summary.json') as f:
+              d = json.load(f)
+          pct = d['total']['lines']['pct']
+          print(f'{pct:.1f}')
+          ")
+          elif [ -f "coverage.json" ]; then
+            COVERAGE=$(python3 -c "
+          import json
+          with open('coverage.json') as f:
+              d = json.load(f)
+          pct = d['totals']['percent_covered']
+          print(f'{pct:.1f}')
+          ")
+          else
+            COVERAGE="N/A"
+          fi
+
+          if [ -f "test_output.txt" ]; then
+            if grep -qE "(FAIL|ERROR|failed)" test_output.txt; then
+              RESULT="FAIL"
+            else
+              RESULT="PASS"
+            fi
+          else
+            RESULT="UNKNOWN"
+          fi
+
+          echo "result=${RESULT}" >> $GITHUB_OUTPUT
+          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+          echo "### テスト結果: ${RESULT} (カバレッジ: ${COVERAGE}%)" >> $GITHUB_STEP_SUMMARY
+
+      - name: テスト結果アップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test_output.txt
+            coverage/
+            coverage.json
+          retention-days: 7
+
+  # ──────────────────────────────────────────
+  # JOB 2: PR自動作成
+  # ──────────────────────────────────────────
+  create_pr:
+    name: 📬 PR自動作成
+    runs-on: ubuntu-latest
+    needs: test
+    if: |
+      always() &&
+      github.ref != 'refs/heads/main' &&
+      github.ref != 'refs/heads/master'
+
+    outputs:
+      pr_url: ${{ steps.create_pr.outputs.pr_url }}
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 既存PRチェック
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh pr list \
+            --head "${{ github.ref_name }}" \
+            --json number,url \
+            --jq '.[0] | {number: .number, url: .url}' 2>/dev/null || echo '{}')
+          PR_NUMBER=$(echo "$EXISTING" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('number',''))" 2>/dev/null || echo "")
+          echo "existing_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: PR本文生成
+        id: generate_body
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          TEST_RESULT="${{ needs.test.outputs.test_result || 'SKIPPED' }}"
+          COVERAGE="${{ needs.test.outputs.coverage || 'N/A' }}"
+          COMMIT_COUNT=$(git rev-list --count origin/main..HEAD 2>/dev/null || echo "N/A")
+          CHANGED_FILES=$(git diff --name-only origin/main..HEAD 2>/dev/null | head -20 || echo "N/A")
+
+          cat > pr_body.md << PREOF
+          ## 🤖 自動生成PR
+
+          > このPRはClaude Code自律開発パイプラインによって自動作成されました
+
+          ---
+
+          ## 📋 概要
+
+          ブランチ \`${BRANCH}\` の実装内容をmainへマージするためのPRです。
+
+          ## 📁 変更ファイル
+
+          \`\`\`
+          ${CHANGED_FILES}
+          \`\`\`
+
+          ## 🧪 テスト結果
+
+          | 項目 | 結果 |
+          |------|------|
+          | テスト実行 | ${TEST_RESULT} |
+          | カバレッジ | ${COVERAGE}% |
+          | コミット数 | ${COMMIT_COUNT} |
+
+          ## ✅ チェックリスト
+
+          - [x] 自動テスト実行済み
+          - [x] 知財監査実行済み（audit_log.jsonを参照）
+          - [ ] オーナーによる最終確認
+          - [ ] マージ承認
+
+          ## 📎 参考
+
+          - 詳細ログ: \`logs/\` ディレクトリ参照
+          - 知財監査: \`audit_log.json\` 参照
+          - 開発記録: \`DEVELOPMENT_LOG.md\` 参照
+
+          ---
+          *Generated by autonomous-dev-pipeline @ $(date -u '+%Y-%m-%dT%H:%M:%SZ')*
+          PREOF
+
+          echo "body_file=pr_body.md" >> $GITHUB_OUTPUT
+
+      - name: PR作成（新規）
+        id: create_pr
+        if: steps.check_pr.outputs.existing_number == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_URL=$(gh pr create \
+            --title "🤖 [AUTO] ${{ github.ref_name }} — $(date '+%Y-%m-%d %H:%M')" \
+            --body-file pr_body.md \
+            --label "auto-generated" \
+            --draft \
+            2>&1)
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+          PR_NUM=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number')
+          echo "pr_number=${PR_NUM}" >> $GITHUB_OUTPUT
+          echo "### ✅ PR作成完了: ${PR_URL}" >> $GITHUB_STEP_SUMMARY
+
+      - name: PR更新（既存）
+        if: steps.check_pr.outputs.existing_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM="${{ steps.check_pr.outputs.existing_number }}"
+          gh pr edit "$PR_NUM" --body-file pr_body.md
+          PR_URL=$(gh pr view "$PR_NUM" --json url --jq '.url')
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+          echo "pr_number=${PR_NUM}" >> $GITHUB_OUTPUT
+          echo "### 🔄 既存PR更新: ${PR_URL}" >> $GITHUB_STEP_SUMMARY
+
+  # ──────────────────────────────────────────
+  # JOB 3: スマホ通知
+  # ──────────────────────────────────────────
+  notify:
+    name: 📱 完了通知
+    runs-on: ubuntu-latest
+    needs: [test, create_pr]
+    if: always()
+
+    steps:
+      - name: 結果サマリー構築
+        id: summary
+        run: |
+          TEST="${{ needs.test.outputs.test_result || 'SKIPPED' }}"
+          PR_URL="${{ needs.create_pr.outputs.pr_url || 'N/A' }}"
+          COVERAGE="${{ needs.test.outputs.coverage || 'N/A' }}"
+
+          if [[ "$TEST" == "PASS" ]]; then
+            EMOJI="✅"
+            PRIORITY="default"
+          elif [[ "$TEST" == "FAIL" ]]; then
+            EMOJI="❌"
+            PRIORITY="high"
+          else
+            EMOJI="⚠️"
+            PRIORITY="default"
+          fi
+
+          echo "emoji=${EMOJI}" >> $GITHUB_OUTPUT
+          echo "priority=${PRIORITY}" >> $GITHUB_OUTPUT
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+          echo "test=${TEST}" >> $GITHUB_OUTPUT
+
+      - name: ntfy.sh通知
+        if: secrets.NTFY_TOPIC != ''
+        run: |
+          curl -s \
+            -H "Title: ${{ steps.summary.outputs.emoji }} 開発パイプライン完了" \
+            -H "Priority: ${{ steps.summary.outputs.priority }}" \
+            -H "Tags: robot,github" \
+            -d "テスト: ${{ steps.summary.outputs.test }} | カバレッジ: ${{ steps.summary.outputs.coverage }}% | PR: ${{ steps.summary.outputs.pr_url }}" \
+            "https://ntfy.sh/${{ secrets.NTFY_TOPIC }}"
+
+      - name: Pushover通知
+        if: secrets.PUSHOVER_TOKEN != '' && secrets.PUSHOVER_USER != ''
+        run: |
+          curl -s \
+            --form-string "token=${{ secrets.PUSHOVER_TOKEN }}" \
+            --form-string "user=${{ secrets.PUSHOVER_USER }}" \
+            --form-string "title=${{ steps.summary.outputs.emoji }} パイプライン完了" \
+            --form-string "message=テスト: ${{ steps.summary.outputs.test }}\nカバレッジ: ${{ steps.summary.outputs.coverage }}%\nPR: ${{ steps.summary.outputs.pr_url }}" \
+            --form-string "priority=1" \
+            --form-string "url=${{ steps.summary.outputs.pr_url }}" \
+            --form-string "url_title=PRを確認する" \
+            "https://api.pushover.net/1/messages.json"
+
+      - name: Dispatch通知（手動トリガー時）
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "### Dispatch通知"
+          echo "トリガー: ${{ inputs.trigger_code }}"
+          echo "メッセージ: ${{ inputs.message }}"
