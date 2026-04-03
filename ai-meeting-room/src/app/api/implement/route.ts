@@ -1,8 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { sendNotification } from "@/lib/notify";
 import { NextRequest } from "next/server";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const AGENT_TIMEOUT_MS = 120000;
 
 interface AgentTask {
   name: string;
@@ -10,169 +9,161 @@ interface AgentTask {
   prompt: string;
 }
 
+function sseEncode(data: object): Uint8Array {
+  return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 async function runAgent(
+  anthropic: Anthropic,
   task: AgentTask,
   context: string,
-  controller: ReadableStreamDefaultController,
-  encoder: TextEncoder
+  writer: WritableStreamDefaultWriter<Uint8Array>
 ): Promise<string> {
-  const send = (data: object) =>
-    controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-
-  send({ type: "agent_start", agent: task.name, role: task.role });
+  await writer.write(
+    sseEncode({ type: "agent_start", agent: task.name, role: task.role })
+  );
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8096,
-      temperature: 0.1,
-      system: `あなたは${task.role}です。省略なし・完全実装のみ出力してください。日本語で作業し、コードはそのまま使える完全版を出力してください。`,
-      messages: [
-        { role: "user", content: `【コンテキスト】\n${context}\n\n【タスク】\n${task.prompt}` },
-      ],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        temperature: 0.2,
+        system: `あなたは優秀な${task.role}です。与えられたコンテキストとタスクに基づいて、具体的かつ実用的な回答を日本語で提供してください。コード例やファイル構成なども含めて詳細に記述してください。`,
+        messages: [
+          {
+            role: "user",
+            content: `## コンテキスト\n${context}\n\n## タスク\n${task.prompt}`,
+          },
+        ],
+      },
+      {
+        timeout: AGENT_TIMEOUT_MS,
+      }
+    );
 
     const result =
       response.content[0].type === "text" ? response.content[0].text : "";
-    send({
-      type: "agent_complete",
-      agent: task.name,
-      length: result.length,
-    });
+    await writer.write(
+      sseEncode({
+        type: "agent_complete",
+        agent: task.name,
+        length: result.length,
+      })
+    );
     return result;
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : "Unknown error";
-    send({ type: "agent_error", agent: task.name, error: errMsg });
-    throw error;
+    console.error(`[Agent ${task.name} error]`, errMsg);
+    await writer.write(
+      sseEncode({ type: "agent_error", agent: task.name, error: errMsg })
+    );
+    return `[${task.name}] エラー: ${errMsg}`;
   }
 }
 
 export async function POST(req: NextRequest) {
   const { designContext, requirement } = await req.json();
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (data: object) =>
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
-        );
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: "ANTHROPIC_API_KEY not set" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
-      const maxRetries = 3;
-      let context = `要件: ${requirement}\n設計コンテキスト: ${designContext}`;
+  if (!designContext && !requirement) {
+    return new Response(
+      JSON.stringify({ error: "designContext or requirement is required" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        send({
-          type: "attempt",
-          attempt,
-          maxRetries,
-          message: `実装試行 ${attempt}/${maxRetries}`,
-        });
+  const anthropic = new Anthropic({ apiKey });
 
-        try {
-          const agents: AgentTask[] = [
-            {
-              name: "PM",
-              role: "プロダクトマネージャー(PM歴10年)",
-              prompt: `以下の要件と設計から完全な仕様書を作成せよ:\n要件: ${requirement}\n設計: ${designContext}\n\n出力: Markdown形式の仕様書(機能一覧・画面一覧・データモデル・タスクリスト)`,
-            },
-            {
-              name: "Architect",
-              role: "システムアーキテクト",
-              prompt: `仕様に基づきアーキテクチャ設計書を作成:\n- 技術スタック選定理由\n- ディレクトリ構造\n- API設計\n- DB設計\n- セキュリティ設計`,
-            },
-            {
-              name: "Frontend",
-              role: "フロントエンドエンジニア(UI/UX専門家)",
-              prompt: `設計書に基づきフロントエンドを完全実装:\n- 全コンポーネント完全実装\n- レスポンシブ対応\n- 各ファイルを === ファイル名 === 区切りで出力`,
-            },
-            {
-              name: "Backend",
-              role: "バックエンドエンジニア(セキュリティ重視)",
-              prompt: `設計書に基づきバックエンドAPIを完全実装:\n- 認証認可\n- バリデーション\n- エラーハンドリング\n- 各ファイルを === ファイル名 === 区切りで出力`,
-            },
-            {
-              name: "QA",
-              role: "QAエンジニア(品質保証専門家)",
-              prompt: `全実装コードのテスト計画とテストコードを作成:\n- テストケース一覧\n- テストコード完全版\n- カバレッジ目標80%以上`,
-            },
-            {
-              name: "IP_Audit",
-              role: "知財監査エージェント",
-              prompt: `全成果物の知財監査:\n- 商標リスク\n- ライセンス確認\n- 著作権リスク\n- リスクがあれば代替案提示`,
-            },
-          ];
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
 
-          context = `要件: ${requirement}\n設計コンテキスト: ${designContext}`;
+  (async () => {
+    try {
+      let context = `## 要件\n${requirement || "(未指定)"}\n\n## 設計コンテキスト（会議での議論内容）\n${designContext || "(未指定)"}`;
 
-          for (const agent of agents) {
-            const result = await runAgent(
-              agent,
-              context,
-              controller,
-              encoder
-            );
-            context += `\n\n=== ${agent.name}の成果物 ===\n${result.slice(0, 3000)}`;
-          }
+      const agents: AgentTask[] = [
+        {
+          name: "プロダクトマネージャー",
+          role: "PM歴10年のプロダクトマネージャー",
+          prompt:
+            "この要件に基づいて、プロダクト仕様書を作成してください。以下を含めてください：\n1. プロダクトの目的とゴール\n2. ユーザーストーリー（主要なもの3-5個）\n3. 機能要件一覧\n4. 非機能要件（パフォーマンス、セキュリティ等）\n5. 優先度付きのロードマップ\n6. 成功指標（KPI）",
+        },
+        {
+          name: "アーキテクト",
+          role: "システムアーキテクト",
+          prompt:
+            "PMの仕様書を踏まえて、システムアーキテクチャを設計してください：\n1. 技術スタック選定と理由\n2. システム構成図（テキストベース）\n3. データベース設計（主要テーブル・スキーマ）\n4. API設計方針\n5. インフラ構成\n6. スケーラビリティ考慮事項",
+        },
+        {
+          name: "フロントエンドエンジニア",
+          role: "フロントエンドエンジニア",
+          prompt:
+            "アーキテクチャ設計を踏まえて、フロントエンド実装計画を作成してください：\n1. ディレクトリ構造\n2. 主要コンポーネント一覧と責務\n3. 状態管理の方針\n4. ルーティング設計\n5. 主要画面のコンポーネントツリー\n6. 主要コンポーネントのサンプルコード（TypeScript/React）",
+        },
+        {
+          name: "バックエンドエンジニア",
+          role: "バックエンドエンジニア（セキュリティ重視）",
+          prompt:
+            "アーキテクチャ設計を踏まえて、バックエンド実装計画を作成してください：\n1. APIエンドポイント一覧（メソッド、パス、リクエスト/レスポンス）\n2. 認証・認可フロー\n3. データベースマイグレーション計画\n4. エラーハンドリング方針\n5. セキュリティ対策\n6. 主要エンドポイントのサンプルコード",
+        },
+        {
+          name: "QAエンジニア",
+          role: "品質保証専門家",
+          prompt:
+            "全体の実装計画を踏まえて、テスト計画を作成してください：\n1. テスト戦略（単体・結合・E2E）\n2. テストケース一覧（主要なもの）\n3. テスト環境構成\n4. CI/CDパイプラインでのテスト配置\n5. 品質基準とカバレッジ目標\n6. 主要テストのサンプルコード",
+        },
+        {
+          name: "知財監査エージェント",
+          role: "知財・ライセンス専門家",
+          prompt:
+            "使用される技術スタックとライブラリについて、知財・ライセンス監査を行ってください：\n1. 使用ライブラリのライセンス一覧\n2. ライセンス互換性チェック\n3. 商用利用上のリスク評価\n4. OSSコンプライアンス要件\n5. 推奨事項と対策",
+        },
+      ];
 
-          send({
-            type: "implementation_complete",
-            message: "全エージェント完了！実装成功！",
-          });
-
-          await sendNotification(
-            "AI開発会議室: 実装完了",
-            `要件「${requirement}」の実装が完了しました！`,
-            "high"
-          );
-
-          break;
-        } catch (error: unknown) {
-          const errMsg =
-            error instanceof Error ? error.message : "Unknown error";
-          send({
-            type: "attempt_failed",
-            attempt,
-            error: errMsg,
-          });
-
-          if (attempt === maxRetries) {
-            send({
-              type: "implementation_failed",
-              message: `${maxRetries}回試行しましたが失敗しました。設計を見直してください。`,
-            });
-
-            await sendNotification(
-              "AI開発会議室: 実装失敗",
-              `要件「${requirement}」の実装が${maxRetries}回失敗しました。`,
-              "urgent"
-            );
-          } else {
-            send({
-              type: "retry",
-              message: `エラー発生。設計を見直して再試行します... (${attempt + 1}/${maxRetries})`,
-            });
-
-            const reviewResult = await runAgent(
-              {
-                name: "ErrorReviewer",
-                role: "エラー分析・設計見直し担当",
-                prompt: `以下のエラーが発生しました。原因を分析し、設計を修正してください:\nエラー: ${errMsg}\n元の設計: ${designContext}`,
-              },
-              context + `\nエラー: ${errMsg}`,
-              controller,
-              encoder
-            );
-            context = reviewResult;
-          }
-        }
+      for (const agent of agents) {
+        const result = await runAgent(anthropic, agent, context, writer);
+        context += `\n\n---\n## ${agent.name}の出力\n${result}`;
       }
 
-      controller.close();
-    },
-  });
+      await writer.write(
+        sseEncode({
+          type: "implementation_complete",
+          message:
+            "全エージェント（PM・アーキテクト・フロントエンド・バックエンド・QA・知財監査）の実装設計が完了しました。",
+        })
+      );
+    } catch (error: unknown) {
+      const errMsg =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error("[Implementation pipeline error]", errMsg);
+      try {
+        await writer.write(
+          sseEncode({
+            type: "implementation_failed",
+            message: `実装パイプラインでエラーが発生しました: ${errMsg}`,
+          })
+        );
+      } catch {
+        // writer may already be closed
+      }
+    } finally {
+      try {
+        await writer.close();
+      } catch {
+        // already closed
+      }
+    }
+  })();
 
-  return new Response(stream, {
+  return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",

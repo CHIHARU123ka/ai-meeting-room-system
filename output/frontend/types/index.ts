@@ -1,241 +1,316 @@
-export interface Todo {
+export interface User {
   id: string
+  email: string
+  name: string
+  department: string
+  role: 'admin' | 'manager' | 'user'
+  avatar?: string
+  phone?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Room {
+  id: string
+  name: string
+  description?: string
+  capacity: number
+  location: string
+  floor: number
+  equipment: Equipment[]
+  amenities: string[]
+  images: string[]
+  isActive: boolean
+  hourlyRate?: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Equipment {
+  id: string
+  name: string
+  type: 'projector' | 'whiteboard' | 'tv' | 'audio' | 'video' | 'other'
+  description?: string
+  isWorking: boolean
+  lastMaintenance?: string
+}
+
+export interface Reservation {
+  id: string
+  roomId: string
+  room: Room
+  userId: string
+  user: User
   title: string
   description?: string
-  completed: boolean
-  priority: 'low' | 'medium' | 'high'
-  category?: string
-  tags: string[]
-  dueDate?: Date
-  createdAt: Date
-  updatedAt: Date
-  color?: string
+  startTime: string
+  endTime: string
+  attendees: ReservationAttendee[]
+  equipment: string[]
+  status: 'confirmed' | 'pending' | 'cancelled' | 'completed'
+  isRecurring: boolean
+  recurringPattern?: RecurringPattern
+  createdAt: string
+  updatedAt: string
 }
 
-export interface TodoFilter {
-  status: 'all' | 'active' | 'completed'
-  priority?: 'low' | 'medium' | 'high'
-  category?: string
-  tag?: string
-  search?: string
-  sortBy: 'createdAt' | 'updatedAt' | 'dueDate' | 'priority' | 'title'
-  sortOrder: 'asc' | 'desc'
+export interface ReservationAttendee {
+  id: string
+  reservationId: string
+  userId: string
+  user: User
+  status: 'invited' | 'accepted' | 'declined' | 'tentative'
+  createdAt: string
 }
 
-export interface TodoStats {
-  total: number
-  completed: number
-  active: number
-  overdue: number
-  completionRate: number
-  todayCompleted: number
-  weekCompleted: number
-  monthCompleted: number
+export interface RecurringPattern {
+  type: 'daily' | 'weekly' | 'monthly'
+  interval: number
+  endDate?: string
+  daysOfWeek?: number[]
 }
 
-export interface UIState {
-  theme: 'light' | 'dark' | 'system'
-  sidebarOpen: boolean
-  filterPanelOpen: boolean
-  selectedTodoId?: string
-  isLoading: boolean
-  error?: string
-  toast?: {
-    id: string
-    title: string
-    description?: string
-    type: 'success' | 'error' | 'warning' | 'info'
-    duration?: number
+export interface AIRecommendation {
+  id: string
+  userId: string
+  type: 'room' | 'time' | 'equipment' | 'attendees'
+  title: string
+  description: string
+  confidence: number
+  data: any
+  isAccepted?: boolean
+  createdAt: string
+}
+
+export interface UsageAnalytics {
+  roomId: string
+  room: Room
+  totalReservations: number
+  totalHours: number
+  utilizationRate: number
+  peakHours: { hour: number; count: number }[]
+  popularEquipment: { equipment: string; count: number }[]
+  averageOccupancy: number
+  period: {
+    start: string
+    end: string
   }
 }
 
-export interface AppSettings {
-  autoSave: boolean
-  notifications: boolean
-  soundEffects: boolean
-  compactMode: boolean
-  showCompletedTodos: boolean
-  defaultPriority: 'low' | 'medium' | 'high'
-  defaultCategory?: string
-  language: 'ja' | 'en'
-  dateFormat: 'relative' | 'absolute'
-  theme: 'light' | 'dark' | 'system'
-}
-
-export interface Category {
+export interface Notification {
   id: string
-  name: string
-  color: string
-  icon?: string
-  description?: string
-  createdAt: Date
-}
-
-export interface Tag {
-  id: string
-  name: string
-  color: string
-  count: number
-}
-
-export interface SearchResult {
-  todos: Todo[]
-  categories: Category[]
-  tags: Tag[]
-  totalResults: number
-  query: string
-}
-
-export interface TodoFormData {
+  userId: string
+  type: 'reservation' | 'reminder' | 'cancellation' | 'system'
   title: string
+  message: string
+  isRead: boolean
+  data?: any
+  createdAt: string
+}
+
+export interface Department {
+  id: string
+  name: string
   description?: string
-  priority: 'low' | 'medium' | 'high'
-  category?: string
-  tags: string[]
-  dueDate?: Date
-  color?: string
+  managerId?: string
+  manager?: User
+  memberCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
+  message?: string
+  errors?: string[]
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 export interface FilterOptions {
-  statuses: Array<'all' | 'active' | 'completed'>
-  priorities: Array<'low' | 'medium' | 'high'>
-  categories: Category[]
-  tags: Tag[]
-  sortOptions: Array<{
-    value: string
-    label: string
-  }>
-}
-
-export interface KeyboardShortcut {
-  key: string
-  ctrlKey?: boolean
-  shiftKey?: boolean
-  altKey?: boolean
-  metaKey?: boolean
-  action: string
-  description: string
-}
-
-export interface AnimationConfig {
-  duration: number
-  ease: string
-  delay?: number
-}
-
-export interface ResponsiveBreakpoint {
-  mobile: number
-  tablet: number
-  desktop: number
-  wide: number
-}
-
-export interface ThemeColors {
-  primary: string
-  secondary: string
-  accent: string
-  background: string
-  foreground: string
-  muted: string
-  border: string
-  glass: {
-    light: string
-    dark: string
+  search?: string
+  capacity?: number
+  floor?: number
+  equipment?: string[]
+  amenities?: string[]
+  availability?: {
+    start: string
+    end: string
   }
 }
 
-export interface LocalStorageData {
-  todos: Todo[]
-  categories: Category[]
-  settings: AppSettings
-  lastSync: Date
-  version: string
+export interface ReservationFormData {
+  roomId: string
+  title: string
+  description?: string
+  startTime: string
+  endTime: string
+  attendees: string[]
+  equipment: string[]
+  isRecurring: boolean
+  recurringPattern?: RecurringPattern
 }
 
-export interface ExportData {
-  todos: Todo[]
-  categories: Category[]
-  settings: AppSettings
-  exportDate: Date
-  version: string
-  format: 'json' | 'csv' | 'txt'
+export interface LoginCredentials {
+  email: string
+  password: string
 }
 
-export interface ImportResult {
-  success: boolean
-  imported: {
-    todos: number
-    categories: number
-  }
-  errors: string[]
-  warnings: string[]
-}
-
-export interface BackupData {
-  id: string
+export interface RegisterData {
+  email: string
+  password: string
   name: string
-  data: LocalStorageData
-  createdAt: Date
-  size: number
-  compressed: boolean
+  department: string
+  phone?: string
 }
 
-export interface PerformanceMetrics {
-  renderTime: number
-  loadTime: number
-  memoryUsage: number
-  todoCount: number
-  lastMeasured: Date
+export interface PasswordResetData {
+  email: string
 }
 
-export interface AccessibilitySettings {
-  highContrast: boolean
-  reducedMotion: boolean
-  screenReader: boolean
-  fontSize: 'small' | 'medium' | 'large'
-  focusIndicator: boolean
+export interface PasswordUpdateData {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
 }
 
-export interface NotificationSettings {
-  enabled: boolean
-  sound: boolean
-  desktop: boolean
-  reminders: boolean
-  dueDateAlerts: boolean
-  completionCelebration: boolean
+export interface UserProfile {
+  name: string
+  email: string
+  phone?: string
+  department: string
+  avatar?: File
 }
 
-export interface SyncSettings {
-  enabled: boolean
-  provider: 'local' | 'cloud'
-  autoSync: boolean
-  syncInterval: number
-  lastSync?: Date
-  conflictResolution: 'local' | 'remote' | 'merge'
+export interface SystemSettings {
+  siteName: string
+  siteDescription: string
+  allowRegistration: boolean
+  requireApproval: boolean
+  maxReservationDays: number
+  maxReservationHours: number
+  businessHours: {
+    start: string
+    end: string
+  }
+  workingDays: number[]
+  emailNotifications: boolean
+  slackIntegration: boolean
+  maintenanceMode: boolean
 }
 
-export type TodoAction = 
-  | { type: 'ADD_TODO'; payload: TodoFormData }
-  | { type: 'UPDATE_TODO'; payload: { id: string; updates: Partial<Todo> } }
-  | { type: 'DELETE_TODO'; payload: string }
-  | { type: 'TOGGLE_TODO'; payload: string }
-  | { type: 'BULK_DELETE'; payload: string[] }
-  | { type: 'BULK_COMPLETE'; payload: string[] }
-  | { type: 'REORDER_TODOS'; payload: { sourceIndex: number; destinationIndex: number } }
-  | { type: 'SET_FILTER'; payload: Partial<TodoFilter> }
-  | { type: 'CLEAR_COMPLETED' }
-  | { type: 'IMPORT_TODOS'; payload: Todo[] }
-  | { type: 'RESET_TODOS' }
+export interface DashboardStats {
+  totalRooms: number
+  totalReservations: number
+  activeUsers: number
+  utilizationRate: number
+  upcomingReservations: Reservation[]
+  popularRooms: { room: Room; count: number }[]
+  recentActivity: {
+    type: 'reservation' | 'cancellation' | 'user_joined'
+    message: string
+    timestamp: string
+    user?: User
+  }[]
+}
 
-export type UIAction =
-  | { type: 'SET_THEME'; payload: 'light' | 'dark' | 'system' }
-  | { type: 'TOGGLE_SIDEBAR' }
-  | { type: 'TOGGLE_FILTER_PANEL' }
-  | { type: 'SELECT_TODO'; payload?: string }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload?: string }
-  | { type: 'SHOW_TOAST'; payload: UIState['toast'] }
-  | { type: 'HIDE_TOAST' }
-  | { type: 'RESET_UI' }
+export interface CalendarEvent {
+  id: string
+  title: string
+  start: Date
+  end: Date
+  resource?: any
+  color?: string
+}
 
-export type AppAction = TodoAction | UIAction
+export interface TimeSlot {
+  start: string
+  end: string
+  isAvailable: boolean
+  reservation?: Reservation
+}
+
+export interface RoomAvailability {
+  roomId: string
+  date: string
+  timeSlots: TimeSlot[]
+}
+
+export interface SearchFilters {
+  query?: string
+  dateRange?: {
+    start: string
+    end: string
+  }
+  capacity?: {
+    min: number
+    max: number
+  }
+  floor?: number[]
+  equipment?: string[]
+  amenities?: string[]
+  priceRange?: {
+    min: number
+    max: number
+  }
+}
+
+export interface SortOption {
+  field: string
+  direction: 'asc' | 'desc'
+  label: string
+}
+
+export interface TableColumn<T> {
+  key: keyof T
+  label: string
+  sortable?: boolean
+  render?: (value: any, item: T) => React.ReactNode
+}
+
+export interface FormField {
+  name: string
+  label: string
+  type: 'text' | 'email' | 'password' | 'number' | 'select' | 'textarea' | 'checkbox' | 'radio' | 'date' | 'time'
+  placeholder?: string
+  required?: boolean
+  options?: { value: string; label: string }[]
+  validation?: any
+}
+
+export interface ModalProps {
+  isOpen: boolean
+  onClose: () => void
+  title?: string
+  children: React.ReactNode
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+}
+
+export interface ToastMessage {
+  id: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  title: string
+  message?: string
+  duration?: number
+}
+
+export interface Theme {
+  mode: 'light' | 'dark'
+  primaryColor: string
+  accentColor: string
+}
+
+export interface AppState {
+  user: User | null
+  isAuthenticated: boolean
+  theme: Theme
+}

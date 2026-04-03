@@ -1,509 +1,770 @@
-# Todoアプリケーション テスト計画書
+# AI会議室管理システム テスト計画書
 
 ## 1. テスト計画
 
-### 1.1 テスト概要
-- **プロジェクト名**: Todoリストアプリケーション
-- **テスト対象**: フロントエンド（Next.js 15 + TypeScript）、バックエンド（FastAPI + Python）
-- **テスト期間**: 開発完了後 2週間
-- **テスト責任者**: QAエンジニア
-- **テスト環境**: 開発環境、ステージング環境、本番環境
-
-### 1.2 テスト目的
-- 機能要件の完全性確認
+### 1.1 テスト目的
+- システムの機能要件が正しく実装されていることを確認
 - 非機能要件（パフォーマンス、セキュリティ、可用性）の検証
-- ユーザビリティの確認
-- クロスブラウザ・レスポンシブ対応の検証
-- API仕様の準拠性確認
+- ユーザビリティの確保
+- 品質基準の達成
 
-### 1.3 テスト戦略
-- **単体テスト**: 各コンポーネント・関数レベル
-- **統合テスト**: API連携、データベース連携
-- **E2Eテスト**: ユーザーシナリオベース
+### 1.2 テスト範囲
+- フロントエンド（Next.js）
+- バックエンドAPI（Fastify）
+- データベース（PostgreSQL + Prisma）
+- 認証・認可システム
+- リアルタイム通信
+- セキュリティ機能
+
+### 1.3 テスト環境
+```yaml
+開発環境:
+  - Node.js: 20.x
+  - PostgreSQL: 15.x
+  - Redis: 7.x
+  - Docker: 24.x
+
+テスト環境:
+  - 本番環境と同等の構成
+  - テストデータベース
+  - モックサービス
+```
+
+### 1.4 テスト戦略
+- **単体テスト**: 各コンポーネント・関数の個別テスト
+- **統合テスト**: API間の連携テスト
+- **E2Eテスト**: ユーザーシナリオベースのテスト
 - **セキュリティテスト**: 脆弱性検査
 - **パフォーマンステスト**: 負荷・ストレステスト
-- **ユーザビリティテスト**: UI/UX検証
-
-### 1.4 テスト環境
-```yaml
-フロントエンド:
-  - Node.js: 18.x以上
-  - ブラウザ: Chrome, Firefox, Safari, Edge
-  - デバイス: Desktop, Tablet, Mobile
-  - テストフレームワーク: Vitest, Testing Library
-
-バックエンド:
-  - Python: 3.11以上
-  - データベース: PostgreSQL 15
-  - Redis: 7.x
-  - テストフレームワーク: pytest, httpx
-```
 
 ## 2. テストケース一覧
 
 ### 2.1 フロントエンド テストケース
 
-#### 2.1.1 認証機能テスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| FE-AUTH-001 | 有効なメールアドレスとパスワードでログイン | ログイン成功、ダッシュボード表示 | 高 |
-| FE-AUTH-002 | 無効なメールアドレスでログイン | エラーメッセージ表示 | 高 |
-| FE-AUTH-003 | 無効なパスワードでログイン | エラーメッセージ表示 | 高 |
-| FE-AUTH-004 | 空のフィールドでログイン | バリデーションエラー表示 | 高 |
-| FE-AUTH-005 | 新規ユーザー登録（有効データ） | 登録成功、確認メール送信 | 高 |
-| FE-AUTH-006 | 重複メールアドレスで登録 | エラーメッセージ表示 | 高 |
-| FE-AUTH-007 | 弱いパスワードで登録 | パスワード強度エラー | 中 |
-| FE-AUTH-008 | ログアウト機能 | セッション終了、ログイン画面遷移 | 高 |
-| FE-AUTH-009 | トークン期限切れ処理 | 自動ログアウト、再ログイン要求 | 高 |
-| FE-AUTH-010 | パスワードリセット | リセットメール送信、新パスワード設定 | 中 |
+#### 2.1.1 認証機能
+```typescript
+// テストケース: AUTH-001
+describe('認証機能', () => {
+  test('正常ログイン', async () => {
+    // 有効な認証情報でログイン成功
+    expect(loginResult.success).toBe(true);
+  });
 
-#### 2.1.2 Todo管理機能テスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| FE-TODO-001 | 新規Todo作成（有効データ） | Todo作成成功、リスト表示 | 高 |
-| FE-TODO-002 | 空のタイトルでTodo作成 | バリデーションエラー表示 | 高 |
-| FE-TODO-003 | 最大文字数超過でTodo作成 | 文字数制限エラー表示 | 中 |
-| FE-TODO-004 | Todo編集機能 | 編集内容保存、表示更新 | 高 |
-| FE-TODO-005 | Todo削除機能 | 削除確認ダイアログ、削除実行 | 高 |
-| FE-TODO-006 | Todo完了/未完了切り替え | ステータス変更、表示更新 | 高 |
-| FE-TODO-007 | Todo優先度設定 | 優先度変更、ソート反映 | 中 |
-| FE-TODO-008 | Todo期限設定 | 期限設定、期限切れ表示 | 中 |
-| FE-TODO-009 | Todoカテゴリ分類 | カテゴリ設定、フィルタリング | 中 |
-| FE-TODO-010 | Todo検索機能 | キーワード検索、結果表示 | 中 |
-| FE-TODO-011 | Todoソート機能 | 各項目でソート実行 | 低 |
-| FE-TODO-012 | Todoフィルタ機能 | ステータス・優先度でフィルタ | 中 |
-| FE-TODO-013 | Todo一括操作 | 複数選択、一括削除/完了 | 低 |
-| FE-TODO-014 | Todoドラッグ&ドロップ | 順序変更、位置保存 | 低 |
-| FE-TODO-015 | Todo詳細表示 | モーダル表示、詳細情報確認 | 中 |
+  test('無効な認証情報', async () => {
+    // 無効な認証情報でログイン失敗
+    expect(loginResult.error).toBeDefined();
+  });
 
-#### 2.1.3 UI/UXテスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| FE-UI-001 | レスポンシブデザイン（モバイル） | 画面サイズに応じた表示調整 | 高 |
-| FE-UI-002 | レスポンシブデザイン（タブレット） | 画面サイズに応じた表示調整 | 高 |
-| FE-UI-003 | ダークモード切り替え | テーマ変更、設定保存 | 中 |
-| FE-UI-004 | ローディング表示 | 非同期処理中の適切な表示 | 中 |
-| FE-UI-005 | エラー表示 | 分かりやすいエラーメッセージ | 高 |
-| FE-UI-006 | 成功通知表示 | 操作完了の適切な通知 | 中 |
-| FE-UI-007 | キーボードナビゲーション | Tab/Enterキーでの操作 | 中 |
-| FE-UI-008 | アクセシビリティ対応 | スクリーンリーダー対応 | 中 |
-| FE-UI-009 | 多言語対応 | 言語切り替え、翻訳表示 | 低 |
-| FE-UI-010 | アニメーション効果 | 適切なトランジション表示 | 低 |
+  test('セッション管理', async () => {
+    // セッション有効期限の確認
+    expect(sessionValid).toBe(true);
+  });
+});
+```
 
-#### 2.1.4 パフォーマンステスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| FE-PERF-001 | 初期ページ読み込み時間 | 3秒以内での表示完了 | 高 |
-| FE-PERF-002 | Todo一覧表示（1000件） | 5秒以内での表示完了 | 中 |
-| FE-PERF-003 | 検索レスポンス時間 | 1秒以内での結果表示 | 中 |
-| FE-PERF-004 | メモリ使用量 | 100MB以下での動作 | 中 |
-| FE-PERF-005 | バンドルサイズ | 1MB以下のJSファイル | 中 |
+#### 2.1.2 会議室予約機能
+```typescript
+// テストケース: BOOKING-001
+describe('会議室予約機能', () => {
+  test('予約作成', async () => {
+    const booking = {
+      roomId: 1,
+      startTime: '2024-01-01T10:00:00Z',
+      endTime: '2024-01-01T11:00:00Z',
+      title: 'テスト会議'
+    };
+    expect(createBooking(booking)).resolves.toBeDefined();
+  });
+
+  test('重複予約チェック', async () => {
+    // 同じ時間帯の予約は拒否される
+    expect(createBooking(duplicateBooking)).rejects.toThrow();
+  });
+
+  test('予約変更', async () => {
+    const updatedBooking = { ...booking, title: '変更後会議' };
+    expect(updateBooking(updatedBooking)).resolves.toBeDefined();
+  });
+
+  test('予約キャンセル', async () => {
+    expect(cancelBooking(bookingId)).resolves.toBe(true);
+  });
+});
+```
+
+#### 2.1.3 UI コンポーネント
+```typescript
+// テストケース: UI-001
+describe('UIコンポーネント', () => {
+  test('カレンダー表示', () => {
+    render(<Calendar />);
+    expect(screen.getByRole('grid')).toBeInTheDocument();
+  });
+
+  test('会議室一覧表示', () => {
+    render(<RoomList rooms={mockRooms} />);
+    expect(screen.getAllByTestId('room-card')).toHaveLength(mockRooms.length);
+  });
+
+  test('フォームバリデーション', async () => {
+    const user = userEvent.setup();
+    render(<BookingForm />);
+    
+    await user.click(screen.getByRole('button', { name: '予約' }));
+    expect(screen.getByText('必須項目です')).toBeInTheDocument();
+  });
+});
+```
 
 ### 2.2 バックエンド テストケース
 
-#### 2.2.1 認証API テスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| BE-AUTH-001 | POST /auth/register（有効データ） | 201 Created、ユーザー作成 | 高 |
-| BE-AUTH-002 | POST /auth/register（重複メール） | 409 Conflict、エラーレスポンス | 高 |
-| BE-AUTH-003 | POST /auth/register（無効メール） | 422 Validation Error | 高 |
-| BE-AUTH-004 | POST /auth/register（弱いパスワード） | 422 Validation Error | 高 |
-| BE-AUTH-005 | POST /auth/login（有効認証情報） | 200 OK、JWTトークン返却 | 高 |
-| BE-AUTH-006 | POST /auth/login（無効認証情報） | 401 Unauthorized | 高 |
-| BE-AUTH-007 | POST /auth/login（存在しないユーザー） | 401 Unauthorized | 高 |
-| BE-AUTH-008 | POST /auth/refresh（有効トークン） | 200 OK、新しいトークン返却 | 高 |
-| BE-AUTH-009 | POST /auth/refresh（無効トークン） | 401 Unauthorized | 高 |
-| BE-AUTH-010 | POST /auth/logout | 200 OK、トークン無効化 | 高 |
-| BE-AUTH-011 | GET /auth/me（認証済み） | 200 OK、ユーザー情報返却 | 高 |
-| BE-AUTH-012 | GET /auth/me（未認証） | 401 Unauthorized | 高 |
-| BE-AUTH-013 | POST /auth/forgot-password | 200 OK、リセットメール送信 | 中 |
-| BE-AUTH-014 | POST /auth/reset-password | 200 OK、パスワード更新 | 中 |
-| BE-AUTH-015 | レート制限テスト | 429 Too Many Requests | 高 |
+#### 2.2.1 API エンドポイント
+```typescript
+// テストケース: API-001
+describe('認証API', () => {
+  test('POST /api/auth/login', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'test@example.com',
+        password: 'password123'
+      });
+    
+    expect(response.status).toBe(200);
+    expect(response.body.token).toBeDefined();
+  });
 
-#### 2.2.2 Todo API テスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| BE-TODO-001 | GET /todos（認証済み） | 200 OK、Todo一覧返却 | 高 |
-| BE-TODO-002 | GET /todos（未認証） | 401 Unauthorized | 高 |
-| BE-TODO-003 | POST /todos（有効データ） | 201 Created、Todo作成 | 高 |
-| BE-TODO-004 | POST /todos（無効データ） | 422 Validation Error | 高 |
-| BE-TODO-005 | GET /todos/{id}（存在するID） | 200 OK、Todo詳細返却 | 高 |
-| BE-TODO-006 | GET /todos/{id}（存在しないID） | 404 Not Found | 高 |
-| BE-TODO-007 | PUT /todos/{id}（有効データ） | 200 OK、Todo更新 | 高 |
-| BE-TODO-008 | PUT /todos/{id}（他ユーザーのTodo） | 403 Forbidden | 高 |
-| BE-TODO-009 | DELETE /todos/{id}（存在するID） | 204 No Content、Todo削除 | 高 |
-| BE-TODO-010 | DELETE /todos/{id}（存在しないID） | 404 Not Found | 高 |
-| BE-TODO-011 | PATCH /todos/{id}/complete | 200 OK、完了ステータス更新 | 高 |
-| BE-TODO-012 | GET /todos?status=completed | 200 OK、フィルタ結果返却 | 中 |
-| BE-TODO-013 | GET /todos?priority=high | 200 OK、優先度フィルタ結果 | 中 |
-| BE-TODO-014 | GET /todos?search=keyword | 200 OK、検索結果返却 | 中 |
-| BE-TODO-015 | GET /todos?page=1&limit=10 | 200 OK、ページネーション | 中 |
+  test('POST /api/auth/register', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'new@example.com',
+        password: 'password123',
+        name: 'Test User'
+      });
+    
+    expect(response.status).toBe(201);
+  });
+});
 
-#### 2.2.3 セキュリティテスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| BE-SEC-001 | SQLインジェクション攻撃 | 攻撃を検出・防御 | 高 |
-| BE-SEC-002 | XSS攻撃テスト | スクリプト実行を防御 | 高 |
-| BE-SEC-003 | CSRF攻撃テスト | CSRF保護機能動作 | 高 |
-| BE-SEC-004 | 認証バイパス試行 | 未認証アクセスを拒否 | 高 |
-| BE-SEC-005 | パスワード総当たり攻撃 | レート制限で防御 | 高 |
-| BE-SEC-006 | JWTトークン改ざん | 改ざんトークンを拒否 | 高 |
-| BE-SEC-007 | 機密情報漏洩チェック | パスワード等の非表示 | 高 |
-| BE-SEC-008 | HTTPSリダイレクト | HTTP→HTTPS自動転送 | 中 |
-| BE-SEC-009 | セキュリティヘッダー | 適切なヘッダー設定 | 中 |
-| BE-SEC-010 | ファイルアップロード攻撃 | 悪意あるファイルを拒否 | 中 |
+// テストケース: API-002
+describe('会議室API', () => {
+  test('GET /api/rooms', async () => {
+    const response = await request(app)
+      .get('/api/rooms')
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body)).toBe(true);
+  });
 
-#### 2.2.4 パフォーマンステスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| BE-PERF-001 | 同時接続100ユーザー | レスポンス時間500ms以下 | 高 |
-| BE-PERF-002 | 同時接続1000ユーザー | レスポンス時間2秒以下 | 中 |
-| BE-PERF-003 | 大量データ処理（10万件） | 処理時間30秒以下 | 中 |
-| BE-PERF-004 | メモリ使用量監視 | 512MB以下での動作 | 中 |
-| BE-PERF-005 | データベース接続プール | 効率的な接続管理 | 中 |
+  test('POST /api/bookings', async () => {
+    const booking = {
+      roomId: 1,
+      startTime: '2024-01-01T10:00:00Z',
+      endTime: '2024-01-01T11:00:00Z',
+      title: 'テスト会議'
+    };
 
-### 2.3 統合テスト
+    const response = await request(app)
+      .post('/api/bookings')
+      .set('Authorization', `Bearer ${token}`)
+      .send(booking);
+    
+    expect(response.status).toBe(201);
+  });
+});
+```
 
-#### 2.3.1 フロントエンド・バックエンド連携テスト
-| ID | テストケース | 期待結果 | 優先度 |
-|---|---|---|---|
-| INT-001 | ユーザー登録フロー | FE→BE→DB→FE完全連携 | 高 |
-| INT-002 | ログインフロー | 認証トークン正常取得・保存 | 高 |
-| INT-003 | Todo CRUD操作 | 全操作の完全連携 | 高 |
-| INT-004 | リアルタイム更新 | WebSocket/SSE連携 | 中 |
-| INT-005 | エラーハンドリング | BE→FEエラー伝播 | 高 |
-| INT-006 | ファイルアップロード | 画像添付機能連携 | 低 |
-| INT-007 | 通知機能 | プッシュ通知連携 | 低 |
-| INT-008 | データ同期 | オフライン→オンライン同期 | 低 |
+#### 2.2.2 データベース操作
+```typescript
+// テストケース: DB-001
+describe('データベース操作', () => {
+  beforeEach(async () => {
+    await prisma.booking.deleteMany();
+    await prisma.room.deleteMany();
+    await prisma.user.deleteMany();
+  });
 
-### 2.4 E2Eテスト
+  test('ユーザー作成', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: 'test@example.com',
+        name: 'Test User',
+        password: 'hashedPassword'
+      }
+    });
+    
+    expect(user.id).toBeDefined();
+    expect(user.email).toBe('test@example.com');
+  });
 
-#### 2.4.1 ユーザーシナリオテスト
-| ID | シナリオ | 期待結果 | 優先度 |
-|---|---|---|---|
-| E2E-001 | 新規ユーザー登録→初回Todo作成 | 完全なオンボーディング体験 | 高 |
-| E2E-002 | 既存ユーザーログイン→Todo管理 | スムーズな日常利用体験 | 高 |
-| E2E-003 | モバイルでのTodo管理 | モバイル最適化体験 | 高 |
-| E2E-004 | 複数デバイス間でのデータ同期 | 一貫したデータ表示 | 中 |
-| E2E-005 | 長期間利用シナリオ | データ整合性維持 | 中 |
-| E2E-006 | エラー回復シナリオ | 適切なエラー処理・回復 | 中 |
-| E2E-007 | パフォーマンス劣化シナリオ | 低速環境での動作確認 | 低 |
+  test('予約作成と関連データ', async () => {
+    const booking = await prisma.booking.create({
+      data: {
+        title: 'テスト会議',
+        startTime: new Date('2024-01-01T10:00:00Z'),
+        endTime: new Date('2024-01-01T11:00:00Z'),
+        userId: user.id,
+        roomId: room.id
+      },
+      include: {
+        user: true,
+        room: true
+      }
+    });
+    
+    expect(booking.user.email).toBe('test@example.com');
+    expect(booking.room.name).toBeDefined();
+  });
+});
+```
+
+### 2.3 統合テストケース
+
+#### 2.3.1 認証フロー
+```typescript
+// テストケース: INTEGRATION-001
+describe('認証統合テスト', () => {
+  test('ログイン→API呼び出し→ログアウト', async () => {
+    // 1. ログイン
+    const loginResponse = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'test@example.com', password: 'password123' });
+    
+    const token = loginResponse.body.token;
+    
+    // 2. 認証が必要なAPI呼び出し
+    const roomsResponse = await request(app)
+      .get('/api/rooms')
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(roomsResponse.status).toBe(200);
+    
+    // 3. ログアウト
+    const logoutResponse = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(logoutResponse.status).toBe(200);
+  });
+});
+```
+
+#### 2.3.2 予約フロー
+```typescript
+// テストケース: INTEGRATION-002
+describe('予約統合テスト', () => {
+  test('会議室検索→予約作成→確認', async () => {
+    // 1. 利用可能な会議室を検索
+    const searchResponse = await request(app)
+      .get('/api/rooms/available')
+      .query({
+        startTime: '2024-01-01T10:00:00Z',
+        endTime: '2024-01-01T11:00:00Z'
+      })
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(searchResponse.body.length).toBeGreaterThan(0);
+    
+    // 2. 予約作成
+    const booking = {
+      roomId: searchResponse.body[0].id,
+      startTime: '2024-01-01T10:00:00Z',
+      endTime: '2024-01-01T11:00:00Z',
+      title: 'テスト会議'
+    };
+    
+    const bookingResponse = await request(app)
+      .post('/api/bookings')
+      .send(booking)
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(bookingResponse.status).toBe(201);
+    
+    // 3. 予約確認
+    const confirmResponse = await request(app)
+      .get(`/api/bookings/${bookingResponse.body.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(confirmResponse.body.title).toBe('テスト会議');
+  });
+});
+```
+
+### 2.4 E2Eテストケース
+
+#### 2.4.1 ユーザーシナリオ
+```typescript
+// テストケース: E2E-001
+import { test, expect } from '@playwright/test';
+
+test('会議室予約の完全フロー', async ({ page }) => {
+  // 1. ログインページにアクセス
+  await page.goto('/login');
+  
+  // 2. ログイン
+  await page.fill('[data-testid="email"]', 'test@example.com');
+  await page.fill('[data-testid="password"]', 'password123');
+  await page.click('[data-testid="login-button"]');
+  
+  // 3. ダッシュボードに遷移
+  await expect(page).toHaveURL('/dashboard');
+  
+  // 4. 会議室予約ページに移動
+  await page.click('[data-testid="booking-nav"]');
+  await expect(page).toHaveURL('/bookings');
+  
+  // 5. 新規予約作成
+  await page.click('[data-testid="new-booking-button"]');
+  await page.fill('[data-testid="title"]', 'E2Eテスト会議');
+  await page.selectOption('[data-testid="room-select"]', '1');
+  await page.fill('[data-testid="start-time"]', '2024-01-01T10:00');
+  await page.fill('[data-testid="end-time"]', '2024-01-01T11:00');
+  await page.click('[data-testid="submit-booking"]');
+  
+  // 6. 予約完了確認
+  await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
+  
+  // 7. 予約一覧で確認
+  await page.goto('/bookings');
+  await expect(page.locator('text=E2Eテスト会議')).toBeVisible();
+});
+
+test('レスポンシブデザイン確認', async ({ page }) => {
+  // モバイルサイズでテスト
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/dashboard');
+  
+  // ハンバーガーメニューが表示されることを確認
+  await expect(page.locator('[data-testid="mobile-menu-button"]')).toBeVisible();
+  
+  // デスクトップサイズでテスト
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.reload();
+  
+  // サイドバーが表示されることを確認
+  await expect(page.locator('[data-testid="sidebar"]')).toBeVisible();
+});
+```
+
+### 2.5 パフォーマンステスト
+
+#### 2.5.1 負荷テスト
+```typescript
+// テストケース: PERFORMANCE-001
+describe('パフォーマンステスト', () => {
+  test('API応答時間', async () => {
+    const startTime = Date.now();
+    
+    const response = await request(app)
+      .get('/api/rooms')
+      .set('Authorization', `Bearer ${token}`);
+    
+    const responseTime = Date.now() - startTime;
+    
+    expect(response.status).toBe(200);
+    expect(responseTime).toBeLessThan(500); // 500ms以内
+  });
+
+  test('同時接続テスト', async () => {
+    const promises = Array.from({ length: 100 }, () =>
+      request(app)
+        .get('/api/rooms')
+        .set('Authorization', `Bearer ${token}`)
+    );
+    
+    const responses = await Promise.all(promises);
+    
+    responses.forEach(response => {
+      expect(response.status).toBe(200);
+    });
+  });
+});
+```
 
 ## 3. カバレッジ目標
 
 ### 3.1 コードカバレッジ目標
 ```yaml
-フロントエンド:
-  - 単体テスト: 90%以上
-  - 統合テスト: 80%以上
-  - E2Eテスト: 70%以上
+全体目標: 85%以上
 
-バックエンド:
-  - 単体テスト: 95%以上
-  - 統合テスト: 85%以上
-  - APIテスト: 100%
+詳細目標:
+  フロントエンド:
+    - コンポーネント: 90%以上
+    - ユーティリティ関数: 95%以上
+    - カスタムフック: 90%以上
+  
+  バックエンド:
+    - コントローラー: 90%以上
+    - サービス層: 95%以上
+    - ミドルウェア: 85%以上
+    - ユーティリティ: 95%以上
 
-全体:
-  - 機能カバレッジ: 100%
-  - 要件カバレッジ: 100%
-  - リスクカバレッジ: 90%以上
+  統合テスト:
+    - APIエンドポイント: 100%
+    - 主要ユーザーフロー: 100%
 ```
 
-### 3.2 テスト実行カバレッジ
+### 3.2 機能カバレッジ目標
 ```yaml
-ブラウザカバレッジ:
-  - Chrome: 必須
-  - Firefox: 必須
-  - Safari: 必須
-  - Edge: 必須
-  - モバイルブラウザ: 必須
+機能カバレッジ: 100%
 
-デバイスカバレッジ:
-  - Desktop: 1920x1080, 1366x768
-  - Tablet: 768x1024, 1024x768
-  - Mobile: 375x667, 414x896
-
-OSカバレッジ:
-  - Windows 10/11
-  - macOS Monterey以降
-  - iOS 15以降
-  - Android 10以降
+対象機能:
+  - ユーザー認証・認可
+  - 会議室管理
+  - 予約管理
+  - 通知機能
+  - レポート機能
+  - 管理者機能
 ```
 
 ## 4. バグレポート（発見した問題点）
 
-### 4.1 重大な問題（Critical）
+### 4.1 重要度：高
 
-#### BUG-001: 認証トークンの不適切な管理
-**問題**: JWTトークンがlocalStorageに平文で保存されている
-**影響**: XSS攻撃によるトークン盗取リスク
-**再現手順**:
-1. ログイン実行
-2. ブラウザ開発者ツールでlocalStorageを確認
-3. JWTトークンが平文で確認できる
-
-**期待動作**: httpOnlyクッキーまたは暗号化された形式での保存
-**実際の動作**: 平文でlocalStorageに保存
+#### BUG-001: セキュリティ脆弱性
+```yaml
+タイトル: JWT秘密鍵がハードコードされている
+重要度: 高
+影響範囲: 認証システム全体
+詳細: |
+  .env.exampleファイルでJWT_SECRETのデフォルト値が設定されているが、
+  本番環境で変更されない可能性がある
+再現手順: |
+  1. .env.exampleを確認
+  2. JWT_SECRETの値を確認
+期待結果: 環境変数での動的設定
+実際結果: 固定値が設定されている
+```
 
 #### BUG-002: SQLインジェクション脆弱性
-**問題**: 検索機能でSQLインジェクションが可能
-**影響**: データベースの不正操作リスク
-**再現手順**:
-1. Todo検索フィールドに `'; DROP TABLE todos; --` を入力
-2. 検索実行
-3. データベースエラーまたは予期しない動作
+```yaml
+タイトル: 動的クエリでのSQLインジェクション可能性
+重要度: 高
+影響範囲: データベース操作
+詳細: |
+  検索機能で直接的なSQL文字列結合が使用されている可能性
+再現手順: |
+  1. 検索APIに悪意のあるクエリを送信
+  2. データベースログを確認
+期待結果: パラメータ化クエリの使用
+実際結果: 文字列結合によるクエリ構築
+```
 
-**期待動作**: パラメータ化クエリによる安全な検索
-**実際の動作**: 生のSQL文字列結合による脆弱性
+### 4.2 重要度：中
 
-#### BUG-003: 認証バイパス
-**問題**: 特定のAPIエンドポイントで認証チェックが不完全
-**影響**: 未認証ユーザーによる不正アクセス
-**再現手順**:
-1. ログアウト状態でAPI直接アクセス
-2. `GET /api/v1/todos` にAuthorizationヘッダーなしでリクエスト
-3. 200レスポンスが返却される
+#### BUG-003: パフォーマンス問題
+```yaml
+タイトル: N+1クエリ問題
+重要度: 中
+影響範囲: 予約一覧表示
+詳細: |
+  予約一覧取得時に関連データを個別に取得している
+再現手順: |
+  1. 予約一覧APIを呼び出し
+  2. データベースクエリログを確認
+期待結果: JOINまたはincludeを使用した効率的なクエリ
+実際結果: 複数の個別クエリが実行される
+```
 
-**期待動作**: 401 Unauthorizedレスポンス
-**実際の動作**: 認証なしでデータ取得可能
+#### BUG-004: エラーハンドリング不備
+```yaml
+タイトル: 詳細なエラー情報の漏洩
+重要度: 中
+影響範囲: API全体
+詳細: |
+  本番環境でスタックトレースが返される
+再現手順: |
+  1. 無効なデータでAPI呼び出し
+  2. レスポンスを確認
+期待結果: 一般的なエラーメッセージ
+実際結果: 詳細なスタックトレース
+```
 
-### 4.2 高優先度問題（High）
+### 4.3 重要度：低
 
-#### BUG-004: CSRF保護の欠如
-**問題**: CSRF攻撃に対する保護が実装されていない
-**影響**: 悪意あるサイトからの不正操作リスク
-**再現手順**:
-1. 外部サイトからPOSTリクエスト送信
-2. ユーザーのセッションで不正操作実行
-3. 操作が成功してしまう
-
-#### BUG-005: レート制限の不備
-**問題**: ログイン試行に対するレート制限が機能していない
-**影響**: ブルートフォース攻撃のリスク
-**再現手順**:
-1. 短時間で大量のログイン試行
-2. レート制限エラーが発生しない
-3. 攻撃が継続可能
-
-#### BUG-006: 入力値検証の不備
-**問題**: フロントエンドの入力検証をバイパス可能
-**影響**: 不正データの登録リスク
-**再現手順**:
-1. ブラウザ開発者ツールでフォーム制限を無効化
-2. 制限を超えるデータを送信
-3. バックエンドで受け入れられる
-
-### 4.3 中優先度問題（Medium）
-
-#### BUG-007: メモリリーク
-**問題**: 長時間使用時にメモリ使用量が増加し続ける
-**影響**: アプリケーションのパフォーマンス劣化
-**再現手順**:
-1. アプリケーションを長時間使用
-2. Todo作成・削除を繰り返し実行
-3. メモリ使用量の継続的増加を確認
-
-#### BUG-008: 競合状態
-**問題**: 同時編集時のデータ競合が適切に処理されない
-**影響**: データの不整合リスク
-**再現手順**:
-1. 複数のブラウザタブで同じTodoを開く
-2. 同時に編集・保存を実行
-3. 最後の更新のみが反映される
-
-#### BUG-009: エラーハンドリングの不備
-**問題**: ネットワークエラー時の適切な処理が不足
-**影響**: ユーザビリティの低下
-**再現手順**:
-1. ネットワーク接続を切断
-2. Todo操作を実行
-3. 適切なエラーメッセージが表示されない
-
-### 4.4 低優先度問題（Low）
-
-#### BUG-010: UI/UXの問題
-**問題**: モバイル表示時のレイアウト崩れ
-**影響**: モバイルユーザビリティの低下
-**再現手順**:
-1. モバイルデバイスでアクセス
-2. 特定の画面サイズで表示確認
-3. レイアウトの崩れを確認
-
-#### BUG-011: パフォーマンス問題
-**問題**: 大量データ表示時の描画遅延
-**影響**: ユーザー体験の低下
-**再現手順**:
-1. 1000件以上のTodoを作成
-2. 一覧表示を実行
-3. 描画完了まで5秒以上要する
+#### BUG-005: UI/UX問題
+```yaml
+タイトル: モバイル表示での要素重複
+重要度: 低
+影響範囲: モバイルUI
+詳細: |
+  小さな画面サイズでボタンが重複表示される
+再現手順: |
+  1. モバイルサイズでページを表示
+  2. 予約フォームを確認
+期待結果: 適切なレスポンシブ表示
+実際結果: 要素の重複
+```
 
 ## 5. 修正提案
 
-### 5.1 セキュリティ修正提案
+### 5.1 セキュリティ修正
 
-#### 修正-001: 認証トークン管理の改善
+#### 修正-001: JWT秘密鍵の動的生成
 ```typescript
-// 現在の実装（問題あり）
-localStorage.setItem('token', token);
+// 修正前
+const JWT_SECRET = "your-super-secret-jwt-key-change-this-in-production";
 
-// 推奨実装
-// httpOnlyクッキーの使用
-document.cookie = `token=${token}; HttpOnly; Secure; SameSite=Strict`;
-
-// または暗号化してlocalStorageに保存
-const encryptedToken = encrypt(token, secretKey);
-localStorage.setItem('token', encryptedToken);
+// 修正後
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+  return crypto.randomBytes(64).toString('hex');
+})();
 ```
 
 #### 修正-002: SQLインジェクション対策
-```python
-# 現在の実装（問題あり）
-query = f"SELECT * FROM todos WHERE title LIKE '%{search_term}%'"
-
-# 推奨実装
-query = "SELECT * FROM todos WHERE title LIKE :search_term"
-result = db.execute(query, {"search_term": f"%{search_term}%"})
-```
-
-#### 修正-003: CSRF保護の実装
-```python
-# FastAPIでのCSRF保護実装
-from fastapi_csrf_protect import CsrfProtect
-
-@app.post("/todos")
-async def create_todo(
-    request: Request,
-    todo: TodoCreate,
-    csrf_protect: CsrfProtect = Depends()
-):
-    csrf_protect.validate_csrf(request)
-    # Todo作成処理
-```
-
-#### 修正-004: レート制限の強化
-```python
-# より厳格なレート制限実装
-from slowapi import Limiter
-
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100/hour"]
-)
-
-@app.post("/auth/login")
-@limiter.limit("5/minute")  # ログインは1分間に5回まで
-async def login(request: Request, credentials: UserLogin):
-    # ログイン処理
-```
-
-### 5.2 パフォーマンス修正提案
-
-#### 修正-005: メモリリーク対策
 ```typescript
-// React Hookでのメモリリーク対策
-useEffect(() => {
-    const subscription = todoService.subscribe(handleUpdate);
-    
-    return () => {
-        // クリーンアップ処理
-        subscription.unsubscribe();
-    };
-}, []);
+// 修正前
+const query = `SELECT * FROM rooms WHERE name LIKE '%${searchTerm}%'`;
 
-// 大量データの仮想化
-import { FixedSizeList as List } from 'react-window';
-
-const TodoList = ({ todos }) => (
-    <List
-        height={600}
-        itemCount={todos.length}
-        itemSize={50}
-        itemData={todos}
-    >
-        {TodoItem}
-    </List>
-);
-```
-
-#### 修正-006: データベースクエリ最適化
-```python
-# インデックスの追加
-class Todo(Base):
-    __tablename__ = "todos"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)  # 検索用インデックス
-    user_id = Column(Integer, ForeignKey("users.id"), index=True)
-    created_at = Column(DateTime, index=True)  # ソート用インデックス
-
-# ページネーションの最適化
-def get_todos(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(Todo)\
-        .filter(Todo.user_id == user_id)\
-        .offset(skip)\
-        .limit(limit)\
-        .options(selectinload(Todo.category))\  # N+1問題対策
-        .all()
-```
-
-### 5.3 エラーハンドリング改善提案
-
-#### 修正-007: 統一的なエラーハンドリング
-```typescript
-// エラーハンドリングの統一化
-class ApiError extends Error {
-    constructor(
-        public status: number,
-        public message: string,
-        public code?: string
-    ) {
-        super(message);
+// 修正後
+const rooms = await prisma.room.findMany({
+  where: {
+    name: {
+      contains: searchTerm,
+      mode: 'insensitive'
     }
+  }
+});
+```
+
+### 5.2 パフォーマンス修正
+
+#### 修正-003: N+1クエリ解決
+```typescript
+// 修正前
+const bookings = await prisma.booking.findMany();
+for (const booking of bookings) {
+  booking.user = await prisma.user.findUnique({ where: { id: booking.userId } });
+  booking.room = await prisma.room.findUnique({ where: { id: booking.roomId } });
 }
 
-const apiClient = {
-    async request<T>(url: string, options?: RequestInit): Promise<T> {
-        try {
-            const response = await fetch(url, options);
-            
-            if (!response.ok) {
-                throw new ApiError(
-                    response.status,
-                    await response.text(),
-                    response.headers.get('X-Error-Code') || undefined
-                );
-            }
-            
-            return await response.json();
-        } catch (error) {
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            throw new ApiError(0, 'Network Error', 'NETWORK_ERROR');
-        }
+// 修正後
+const bookings = await prisma.booking.findMany({
+  include: {
+    user: {
+      select: { id: true, name: true, email: true }
+    },
+    room: {
+      select: { id: true, name: true, capacity: true }
     }
+  }
+});
+```
+
+### 5.3 エラーハンドリング修正
+
+#### 修正-004: 統一エラーハンドラー
+```typescript
+// エラーハンドリングミドルウェア
+export const errorHandler = (error: Error, request: FastifyRequest, reply: FastifyReply) => {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  logger.error({
+    error: error.message,
+    stack: error.stack,
+    url: request.url,
+    method: request.method
+  });
+
+  if (error instanceof ValidationError) {
+    return reply.status(400).send({
+      error: 'Validation Error',
+      message: error.message,
+      ...(isDevelopment && { details: error.details })
+    });
+  }
+
+  if (error instanceof AuthenticationError) {
+    return reply.status(401).send({
+      error: 'Authentication Error',
+      message: 'Invalid credentials'
+    });
+  }
+
+  // 本番環境では詳細なエラー情報を隠す
+  return reply.status(500).send({
+    error: 'Internal Server Error',
+    message: isDevelopment ? error.message : 'Something went wrong',
+    ...(isDevelopment && { stack: error.stack })
+  });
 };
 ```
 
-#### 修正-008: 競合状態の解決
-```python
-# 楽観的ロックの実装
-class Todo(Base):
-    __tablename__ = "todos"
-    
-    id = Column(Integer, primary_key=True)
-    title = Column(String)
-    version = Column(Integer, default=1)  # バージョン管理
-    updated_at = Column(DateTime, default=datetime.utcnow)
+### 5.4 UI/UX修正
 
-async def update_todo(db: Session, todo_id: int, todo_update: TodoUpdate, current_version: int):
-    todo = db.query(Todo).filter(Todo.id == todo_id).first()
+#### 修正-005: レスポンシブデザイン改善
+```css
+/* 修正前 */
+.booking-form {
+  display: flex;
+  gap: 1rem;
+}
+
+/* 修正後 */
+.booking-form {
+  display: flex;
+  gap: 1rem;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .booking-form {
+    flex-direction: row;
+  }
+}
+```
+
+## 6. セキュリティチェック
+
+### 6.1 認証・認可
+
+#### チェック項目
+```yaml
+✅ JWT実装の確認:
+  - 秘密鍵の安全な管理
+  - トークン有効期限の設定
+  - リフレッシュトークンの実装
+
+✅ パスワードセキュリティ:
+  - bcryptによるハッシュ化
+  - 適切なソルトラウンド数
+  - パスワード強度チェック
+
+✅ セッション管理:
+  - セッション固定攻撃対策
+  - セッションハイジャック対策
+  - 適切なログアウト処理
+```
+
+### 6.2 入力検証
+
+#### チェック項目
+```yaml
+✅ バリデーション:
+  - Zodスキーマによる型安全性
+  - SQLインジェクション対策
+  - XSS対策
+
+✅ ファイルアップロード:
+  - ファイル形式制限
+  - ファイルサイズ制限
+  - ウイルススキャン（推奨）
+```
+
+### 6.3 通信セキュリティ
+
+#### チェック項目
+```yaml
+✅ HTTPS強制:
+  - SSL/TLS証明書の設定
+  - HTTPからHTTPSへのリダイレクト
+  - セキュリティヘッダーの設定
+
+✅ CORS設定:
+  - 適切なオリジン制限
+  - 認証情報の取り扱い
+  - プリフライトリクエスト対応
+```
+
+### 6.4 データ保護
+
+#### チェック項目
+```yaml
+✅ 個人情報保護:
+  - データ暗号化
+  - アクセスログ記録
+  - データ保持期間の設定
+
+✅ データベースセキュリティ:
+  - 接続文字列の暗号化
+  - 最小権限の原則
+  - バックアップの暗号化
+```
+
+### 6.5 セキュリティテストケース
+
+```typescript
+// セキュリティテスト例
+describe('セキュリティテスト', () => {
+  test('SQLインジェクション対策', async () => {
+    const maliciousInput = "'; DROP TABLE users; --";
     
-    if todo.version != current_version:
-        raise HTTPException(
-            status_code=409,
-            detail="Todo has been modified by another user"
-        )
+    const response = await request(app)
+      .get('/api/rooms/search')
+      .query({ name: maliciousInput })
+      .set('Authorization', `Bearer ${token}`);
     
-    # 更新処理
-    todo.version +=
+    expect(response.status).toBe(200);
+    // データベースが正常に動作することを確認
+    const users = await prisma.user.findMany();
+    expect(users.length).toBeGreaterThan(0);
+  });
+
+  test('XSS対策', async () => {
+    const xssPayload = '<script>alert("XSS")</script>';
+    
+    const response = await request(app)
+      .post('/api/bookings')
+      .send({
+        title: xssPayload,
+        roomId: 1,
+        startTime: '2024-01-01T10:00:00Z',
+        endTime: '2024-01-01T11:00:00Z'
+      })
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(response.body.title).not.toContain('<script>');
+  });
+
+  test('認証バイパス試行', async () => {
+    const response = await request(app)
+      .get('/api/admin/users');
+    
+    expect(response.status).toBe(401);
+  });
+});
+```
+
+## 7. テスト実行計画
+
+### 7.1 テスト実行スケジュール
+```yaml
+Phase 1 - 単体テスト (1週間):
+  - フロントエンドコンポーネントテスト
+  - バックエンドユニットテスト
+  - カバレッジ測定
+
+Phase 2 - 統合テスト (1週間):
+  - API統合テスト
+  - データベース統合テスト
+  - 外部サービス連携テスト
+
+Phase 3 - E2Eテスト (1週間):
+  - ユーザーシナリオテスト
+  - ブラウザ互換性テスト
+  - レスポンシブテスト
+
+Phase 4 - 非機能テスト (1週間):
+  - パフォーマンステスト
+  - セキュリティテスト
+  - 可用性テスト
+```
+
+### 7.2 品質ゲート
+```yaml
+リリース判定基準:
+  - 単体テストカバレッジ: 85%以上
+  - 統合テストカバレッジ: 100%
+  - E2Eテスト成功率: 100%
+  - セキュリティテスト: 全項目クリア
+  - パフォーマンス: 応答時間500ms以内
+  - 重要度高のバグ: 0件
+  - 重要度中のバグ: 5件以下
+```
+
+この包括的なテスト計画により、AI会議室管理システムの品質を確保し、安全で信頼性の高いシステムの提供を保証します。

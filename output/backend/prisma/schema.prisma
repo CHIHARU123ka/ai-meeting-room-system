@@ -8,77 +8,302 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  email     String   @unique @db.VarChar(255)
-  password  String   @db.VarChar(255)
-  name      String?  @db.VarChar(100)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                String   @id @default(cuid())
+  email             String   @unique
+  username          String?  @unique
+  firstName         String
+  lastName          String
+  password          String?
+  avatar            String?
+  phone             String?
+  department        String?
+  position          String?
+  role              UserRole @default(USER)
+  status            UserStatus @default(ACTIVE)
+  emailVerified     Boolean  @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  preferences       Json?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  todos Todo[]
+  // Relations
+  reservations      Reservation[]
+  createdRooms      Room[]        @relation("RoomCreator")
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  socialLogins      SocialLogin[]
+  refreshTokens     RefreshToken[]
 
   @@map("users")
-  @@index([email])
-  @@index([isActive])
 }
 
-model Todo {
-  id        String   @id @default(uuid()) @db.Uuid
-  title     String   @db.VarChar(200)
-  completed Boolean  @default(false)
-  userId    String   @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+model SocialLogin {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String
+  providerId String
+  email      String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("todos")
-  @@index([completed])
-  @@index([createdAt])
-  @@index([userId])
-  @@index([userId, completed])
+  @@unique([provider, providerId])
+  @@map("social_logins")
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid()) @db.Uuid
-  token     String   @unique @db.VarChar(500)
-  userId    String   @map("user_id") @db.Uuid
-  expiresAt DateTime @map("expires_at") @db.Timestamptz
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
+}
+
+model Room {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  capacity    Int
+  location    String
+  floor       String?
+  building    String?
+  type        RoomType   @default(MEETING)
+  status      RoomStatus @default(ACTIVE)
+  amenities   String[]
+  images      String[]
+  metadata    Json?
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  createdBy     User          @relation("RoomCreator", fields: [createdById], references: [id])
+  reservations  Reservation[]
+  equipment     Equipment[]
+  sensors       IoTSensor[]
+
+  @@map("rooms")
+}
+
+model Equipment {
+  id          String          @id @default(cuid())
+  roomId      String
+  name        String
+  type        EquipmentType
+  status      EquipmentStatus @default(AVAILABLE)
+  description String?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("equipment")
+}
+
+model IoTSensor {
+  id          String     @id @default(cuid())
+  roomId      String
+  sensorId    String     @unique
+  type        SensorType
+  status      SensorStatus @default(ACTIVE)
+  lastReading Json?
+  lastReadingAt DateTime?
+  metadata    Json?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("iot_sensors")
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  roomId      String
+  userId      String
+  startTime   DateTime
+  endTime     DateTime
+  status      ReservationStatus @default(CONFIRMED)
+  attendees   String[]
+  isRecurring Boolean           @default(false)
+  recurrenceRule String?
+  parentId    String?
+  externalId  String?
+  source      String?           @default("INTERNAL")
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  room         Room           @relation(fields: [roomId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+  parent       Reservation?   @relation("RecurringReservation", fields: [parentId], references: [id])
+  children     Reservation[]  @relation("RecurringReservation")
+  notifications Notification[]
+
+  @@map("reservations")
+}
+
+model Notification {
+  id            String             @id @default(cuid())
+  userId        String
+  reservationId String?
+  type          NotificationType
+  title         String
+  message       String
+  status        NotificationStatus @default(PENDING)
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  metadata      Json?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
 model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @map("user_id") @db.Uuid
-  action    String   @db.VarChar(50)
-  resource  String   @db.VarChar(50)
-  resourceId String? @map("resource_id") @db.Uuid
-  details   Json?
-  ipAddress String?  @map("ip_address") @db.VarChar(45)
-  userAgent String?  @map("user_agent") @db.Text
-  timestamp DateTime @default(now()) @db.Timestamptz
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
-  @@index([userId])
-  @@index([action])
-  @@index([resource])
-  @@index([timestamp])
 }
 
-model SystemLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  level     String   @db.VarChar(10)
-  message   String   @db.Text
-  meta      Json?
-  timestamp DateTime @default(now()) @db.Timestamptz
+model Analytics {
+  id          String      @id @default(cuid())
+  type        AnalyticsType
+  date        DateTime
+  roomId      String?
+  userId      String?
+  value       Float
+  metadata    Json?
+  createdAt   DateTime    @default(now())
 
-  @@map("system_logs")
-  @@index([level])
-  @@index([timestamp])
+  @@unique([type, date, roomId, userId])
+  @@map("analytics")
+}
+
+// Enums
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum RoomType {
+  MEETING
+  CONFERENCE
+  PHONE_BOOTH
+  TRAINING
+  EVENT
+  HUDDLE
+}
+
+enum RoomStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RESERVED
+}
+
+enum EquipmentType {
+  PROJECTOR
+  TV
+  WHITEBOARD
+  PHONE
+  CAMERA
+  MICROPHONE
+  SPEAKER
+  COMPUTER
+  OTHER
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  BROKEN
+}
+
+enum SensorType {
+  OCCUPANCY
+  TEMPERATURE
+  HUMIDITY
+  LIGHT
+  NOISE
+  AIR_QUALITY
+  MOTION
+}
+
+enum SensorStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  MAINTENANCE
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum NotificationType {
+  RESERVATION_CONFIRMED
+  RESERVATION_CANCELLED
+  RESERVATION_REMINDER
+  ROOM_AVAILABLE
+  SYSTEM_MAINTENANCE
+  CUSTOM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum AnalyticsType {
+  ROOM_USAGE
+  USER_ACTIVITY
+  BOOKING_RATE
+  CANCELLATION_RATE
+  NO_SHOW_RATE
+  EFFICIENCY_SCORE
+  OCCUPANCY_RATE
 }

@@ -1,1002 +1,956 @@
-承知しました。設計書に基づき、セキュリティを重視したバックエンドAPIを完全実装いたします。FastAPIを選択し、完全なバリデーション、エラーハンドリング、セキュリティ対策を実装します。
+設計書に基づき、バックエンドAPIを完全実装いたします。セキュリティを重視したFastifyベースの実装を提供します。
 
-=== requirements.txt ===
-```txt
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-decouple==3.8
-sqlalchemy==2.0.23
-alembic==1.12.1
-psycopg2-binary==2.9.9
-pydantic[email]==2.5.0
-pydantic-settings==2.1.0
-redis==5.0.1
-celery==5.3.4
-pytest==7.4.3
-pytest-asyncio==0.21.1
-httpx==0.25.2
-faker==20.1.0
-coverage==7.3.2
-black==23.11.0
-isort==5.12.0
-flake8==6.1.0
-mypy==1.7.1
-bandit==1.7.5
-safety==2.3.5
-pre-commit==3.6.0
-slowapi==0.1.9
-email-validator==2.1.0
-cryptography==41.0.8
-bcrypt==4.1.2
+=== package.json ===
+```json
+{
+  "name": "ai-meeting-room-backend",
+  "version": "1.0.0",
+  "description": "AI-powered meeting room management system backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seeds/index.ts",
+    "db:studio": "prisma studio",
+    "docker:build": "docker build -t ai-meeting-room-backend .",
+    "docker:run": "docker-compose up -d"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/jwt": "^7.2.4",
+    "@fastify/multipart": "^8.0.0",
+    "@fastify/rate-limit": "^9.1.0",
+    "@fastify/redis": "^6.1.1",
+    "@fastify/swagger": "^8.14.0",
+    "@fastify/swagger-ui": "^2.1.0",
+    "@prisma/client": "^5.7.1",
+    "bcryptjs": "^2.4.3",
+    "bull": "^4.12.2",
+    "fastify": "^4.25.2",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.8",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/bull": "^4.10.0",
+    "@types/jest": "^29.5.11",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.6",
+    "@types/nodemailer": "^6.4.14",
+    "@types/passport": "^1.0.16",
+    "@types/passport-google-oauth20": "^2.0.14",
+    "@types/passport-jwt": "^3.0.13",
+    "@types/passport-local": "^1.0.38",
+    "@types/supertest": "^6.0.2",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.1",
+    "prisma": "^5.7.1",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.1.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
 ```
 
 === .env.example ===
 ```env
-# Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/todoapp
-DATABASE_TEST_URL=postgresql://username:password@localhost:5432/todoapp_test
+# Application
+NODE_ENV=development
+PORT=3001
+HOST=0.0.0.0
+API_VERSION=v1
 
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-REDIS_TEST_URL=redis://localhost:6379/1
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/meeting_room_db?schema=public"
+DATABASE_POOL_SIZE=10
+DATABASE_TIMEOUT=30000
 
-# JWT Configuration
-JWT_SECRET_KEY=your-super-secret-jwt-key-change-this-in-production
-JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+# Redis
+REDIS_URL="redis://localhost:6379"
+REDIS_PASSWORD=""
+REDIS_DB=0
 
-# Security Configuration
+# JWT
+JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
+JWT_EXPIRES_IN="24h"
+JWT_REFRESH_SECRET="your-super-secret-refresh-key-change-this-in-production"
+JWT_REFRESH_EXPIRES_IN="7d"
+
+# Encryption
 BCRYPT_ROUNDS=12
-PASSWORD_MIN_LENGTH=8
-MAX_LOGIN_ATTEMPTS=5
-LOCKOUT_DURATION_MINUTES=15
-
-# CORS Configuration
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-ALLOWED_METHODS=GET,POST,PUT,DELETE,PATCH,OPTIONS
-ALLOWED_HEADERS=*
+ENCRYPTION_KEY="your-32-character-encryption-key-here"
 
 # Rate Limiting
-RATE_LIMIT_REQUESTS_PER_MINUTE=60
-RATE_LIMIT_BURST=10
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW=900000
 
-# Application Configuration
-APP_NAME=Todo API
-APP_VERSION=1.0.0
-APP_DESCRIPTION=Secure Todo Application API
-DEBUG=False
-ENVIRONMENT=development
+# CORS
+CORS_ORIGIN="http://localhost:3000"
+CORS_CREDENTIALS=true
 
-# Email Configuration (Optional)
-SMTP_HOST=smtp.gmail.com
+# Email
+SMTP_HOST="smtp.gmail.com"
 SMTP_PORT=587
-SMTP_USERNAME=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-EMAIL_FROM=noreply@todoapp.com
+SMTP_SECURE=false
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+EMAIL_FROM="noreply@meetingroom.com"
 
-# Monitoring Configuration
-SENTRY_DSN=your-sentry-dsn-here
-LOG_LEVEL=INFO
+# AWS
+AWS_REGION="us-east-1"
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_SECRET_ACCESS_KEY="your-secret-key"
+S3_BUCKET_NAME="meeting-room-files"
+S3_PRESIGNED_URL_EXPIRES=3600
 
-# File Upload Configuration
-MAX_FILE_SIZE_MB=5
-ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif
+# Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+GOOGLE_CALLBACK_URL="http://localhost:3001/api/v1/auth/google/callback"
 
-# API Documentation
-DOCS_URL=/docs
-REDOC_URL=/redoc
-OPENAPI_URL=/openapi.json
+# Microsoft OAuth
+MICROSOFT_CLIENT_ID="your-microsoft-client-id"
+MICROSOFT_CLIENT_SECRET="your-microsoft-client-secret"
+MICROSOFT_CALLBACK_URL="http://localhost:3001/api/v1/auth/microsoft/callback"
+
+# External APIs
+GOOGLE_CALENDAR_API_KEY="your-google-calendar-api-key"
+MICROSOFT_GRAPH_API_KEY="your-microsoft-graph-api-key"
+SLACK_BOT_TOKEN="your-slack-bot-token"
+TEAMS_WEBHOOK_URL="your-teams-webhook-url"
+
+# AI Service
+AI_SERVICE_URL="http://localhost:8000"
+AI_SERVICE_API_KEY="your-ai-service-api-key"
+
+# IoT Integration
+IOT_MQTT_BROKER="mqtt://localhost:1883"
+IOT_MQTT_USERNAME="iot-user"
+IOT_MQTT_PASSWORD="iot-password"
+
+# Monitoring
+LOG_LEVEL="info"
+LOG_FILE_PATH="./logs/app.log"
+ENABLE_REQUEST_LOGGING=true
+
+# Security
+HELMET_CSP_ENABLED=true
+HELMET_HSTS_ENABLED=true
+TRUSTED_PROXIES="127.0.0.1"
+
+# Feature Flags
+ENABLE_AI_RECOMMENDATIONS=true
+ENABLE_IOT_INTEGRATION=true
+ENABLE_CALENDAR_SYNC=true
+ENABLE_NOTIFICATIONS=true
+ENABLE_ANALYTICS=true
+
+# Background Jobs
+QUEUE_REDIS_URL="redis://localhost:6379"
+QUEUE_CONCURRENCY=5
+QUEUE_RETRY_ATTEMPTS=3
+QUEUE_RETRY_DELAY=5000
+
+# File Upload
+MAX_FILE_SIZE=10485760
+ALLOWED_FILE_TYPES="image/jpeg,image/png,image/gif,application/pdf"
+UPLOAD_PATH="./uploads"
+
+# Cache
+CACHE_TTL=3600
+CACHE_MAX_KEYS=1000
+
+# Health Check
+HEALTH_CHECK_TIMEOUT=5000
+HEALTH_CHECK_INTERVAL=30000
 ```
 
-=== app/__init__.py ===
-```python
-"""
-Todo Application API Package
-"""
-
-__version__ = "1.0.0"
-__author__ = "Todo App Team"
-__email__ = "team@todoapp.com"
-```
-
-=== app/main.py ===
-```python
-"""
-FastAPI Application Main Module
-"""
-
-import logging
-import time
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-import uvicorn
-from fastapi import FastAPI, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-
-from app.api.v1.router import api_router
-from app.core.config import settings
-from app.core.database import engine, get_db
-from app.core.exceptions import (
-    CustomHTTPException,
-    ValidationException,
-    custom_http_exception_handler,
-    validation_exception_handler,
-)
-from app.core.logging import setup_logging
-from app.core.security import SecurityHeaders
-from app.models.base import Base
-
-# Setup logging
-setup_logging()
-logger = logging.getLogger(__name__)
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan events"""
-    # Startup
-    logger.info("Starting up Todo API...")
-    
-    # Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    logger.info("Database tables created successfully")
-    logger.info("Todo API startup complete")
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down Todo API...")
-    await engine.dispose()
-    logger.info("Todo API shutdown complete")
-
-
-# Create FastAPI application
-app = FastAPI(
-    title=settings.APP_NAME,
-    description=settings.APP_DESCRIPTION,
-    version=settings.APP_VERSION,
-    docs_url=settings.DOCS_URL if settings.DEBUG else None,
-    redoc_url=settings.REDOC_URL if settings.DEBUG else None,
-    openapi_url=settings.OPENAPI_URL if settings.DEBUG else None,
-    lifespan=lifespan,
-)
-
-# Add rate limiting
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Add security headers middleware
-app.add_middleware(SecurityHeaders)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=settings.ALLOWED_METHODS,
-    allow_headers=settings.ALLOWED_HEADERS,
-    expose_headers=["X-Total-Count", "X-Rate-Limit-Remaining"],
-)
-
-# Add trusted host middleware
-if not settings.DEBUG:
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=settings.ALLOWED_HOSTS,
-    )
-
-
-@app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
-    """Add process time header to responses"""
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
-    return response
-
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log all requests"""
-    start_time = time.time()
-    
-    # Log request
-    logger.info(
-        f"Request: {request.method} {request.url.path} "
-        f"from {request.client.host if request.client else 'unknown'}"
-    )
-    
-    response = await call_next(request)
-    
-    # Log response
-    process_time = time.time() - start_time
-    logger.info(
-        f"Response: {response.status_code} "
-        f"in {process_time:.4f}s"
-    )
-    
-    return response
-
-
-# Add custom exception handlers
-app.add_exception_handler(CustomHTTPException, custom_http_exception_handler)
-app.add_exception_handler(ValidationException, validation_exception_handler)
-
-
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "Todo API is running",
-        "version": settings.APP_VERSION,
-        "docs": f"{settings.DOCS_URL}" if settings.DEBUG else "Documentation disabled in production",
+=== tsconfig.json ===
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "removeComments": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"],
+      "@/config/*": ["./config/*"],
+      "@/controllers/*": ["./controllers/*"],
+      "@/services/*": ["./services/*"],
+      "@/repositories/*": ["./repositories/*"],
+      "@/middleware/*": ["./middleware/*"],
+      "@/types/*": ["./types/*"],
+      "@/utils/*": ["./utils/*"],
+      "@/schemas/*": ["./schemas/*"]
     }
-
-
-@app.get("/health", tags=["Health"])
-async def health_check():
-    """Health check endpoint"""
-    try:
-        # Test database connection
-        async with get_db() as db:
-            await db.execute("SELECT 1")
-        
-        return {
-            "status": "healthy",
-            "timestamp": time.time(),
-            "version": settings.APP_VERSION,
-            "environment": settings.ENVIRONMENT,
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "unhealthy",
-                "timestamp": time.time(),
-                "error": "Database connection failed",
-            }
-        )
-
-
-# Include API router
-app.include_router(api_router, prefix="/api/v1")
-
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower(),
-    )
+  },
+  "include": [
+    "src/**/*",
+    "prisma/seeds/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ]
+}
 ```
 
-=== app/core/config.py ===
-```python
-"""
-Application Configuration
-"""
+=== prisma/schema.prisma ===
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
 
-import secrets
-from typing import List, Optional
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
-from pydantic import AnyHttpUrl, EmailStr, validator
-from pydantic_settings import BaseSettings
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  username          String?  @unique
+  firstName         String
+  lastName          String
+  password          String?
+  avatar            String?
+  phone             String?
+  department        String?
+  position          String?
+  role              UserRole @default(USER)
+  status            UserStatus @default(ACTIVE)
+  emailVerified     Boolean  @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  preferences       Json?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
+  // Relations
+  reservations      Reservation[]
+  createdRooms      Room[]        @relation("RoomCreator")
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  socialLogins      SocialLogin[]
+  refreshTokens     RefreshToken[]
 
-class Settings(BaseSettings):
-    """Application settings"""
-    
-    # Application
-    APP_NAME: str = "Todo API"
-    APP_VERSION: str = "1.0.0"
-    APP_DESCRIPTION: str = "Secure Todo Application API"
-    DEBUG: bool = False
-    ENVIRONMENT: str = "development"
-    
-    # Database
-    DATABASE_URL: str
-    DATABASE_TEST_URL: Optional[str] = None
-    
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
-    REDIS_TEST_URL: str = "redis://localhost:6379/1"
-    
-    # JWT
-    JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
-    # Security
-    BCRYPT_ROUNDS: int = 12
-    PASSWORD_MIN_LENGTH: int = 8
-    MAX_LOGIN_ATTEMPTS: int = 5
-    LOCKOUT_DURATION_MINUTES: int = 15
-    
-    # CORS
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
-    ALLOWED_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    ALLOWED_HEADERS: List[str] = ["*"]
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
-    
-    # Rate Limiting
-    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
-    RATE_LIMIT_BURST: int = 10
-    
-    # Email
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    EMAIL_FROM: Optional[EmailStr] = None
-    
-    # Monitoring
-    SENTRY_DSN: Optional[str] = None
-    LOG_LEVEL: str = "INFO"
-    
-    # File Upload
-    MAX_FILE_SIZE_MB: int = 5
-    ALLOWED_FILE_TYPES: List[str] = ["image/jpeg", "image/png", "image/gif"]
-    
-    # API Documentation
-    DOCS_URL: str = "/docs"
-    REDOC_URL: str = "/redoc"
-    OPENAPI_URL: str = "/openapi.json"
-    
-    @validator("ALLOWED_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
-        """Parse CORS origins"""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
-    
-    @validator("ALLOWED_METHODS", pre=True)
-    def assemble_cors_methods(cls, v: str | List[str]) -> List[str]:
-        """Parse CORS methods"""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
-    
-    @validator("ALLOWED_HEADERS", pre=True)
-    def assemble_cors_headers(cls, v: str | List[str]) -> List[str]:
-        """Parse CORS headers"""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
-    
-    @validator("ALLOWED_HOSTS", pre=True)
-    def assemble_allowed_hosts(cls, v: str | List[str]) -> List[str]:
-        """Parse allowed hosts"""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
-    
-    @validator("ALLOWED_FILE_TYPES", pre=True)
-    def assemble_file_types(cls, v: str | List[str]) -> List[str]:
-        """Parse allowed file types"""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+  @@map("users")
+}
 
+model SocialLogin {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String
+  providerId String
+  email      String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-settings = Settings()
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("social_logins")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Room {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  capacity    Int
+  location    String
+  floor       String?
+  building    String?
+  type        RoomType   @default(MEETING)
+  status      RoomStatus @default(ACTIVE)
+  amenities   String[]
+  images      String[]
+  metadata    Json?
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  createdBy     User          @relation("RoomCreator", fields: [createdById], references: [id])
+  reservations  Reservation[]
+  equipment     Equipment[]
+  sensors       IoTSensor[]
+
+  @@map("rooms")
+}
+
+model Equipment {
+  id          String          @id @default(cuid())
+  roomId      String
+  name        String
+  type        EquipmentType
+  status      EquipmentStatus @default(AVAILABLE)
+  description String?
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("equipment")
+}
+
+model IoTSensor {
+  id          String     @id @default(cuid())
+  roomId      String
+  sensorId    String     @unique
+  type        SensorType
+  status      SensorStatus @default(ACTIVE)
+  lastReading Json?
+  lastReadingAt DateTime?
+  metadata    Json?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("iot_sensors")
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  roomId      String
+  userId      String
+  startTime   DateTime
+  endTime     DateTime
+  status      ReservationStatus @default(CONFIRMED)
+  attendees   String[]
+  isRecurring Boolean           @default(false)
+  recurrenceRule String?
+  parentId    String?
+  externalId  String?
+  source      String?           @default("INTERNAL")
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  room         Room           @relation(fields: [roomId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+  parent       Reservation?   @relation("RecurringReservation", fields: [parentId], references: [id])
+  children     Reservation[]  @relation("RecurringReservation")
+  notifications Notification[]
+
+  @@map("reservations")
+}
+
+model Notification {
+  id            String             @id @default(cuid())
+  userId        String
+  reservationId String?
+  type          NotificationType
+  title         String
+  message       String
+  status        NotificationStatus @default(PENDING)
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  metadata      Json?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservation Reservation? @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  resourceId String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model Analytics {
+  id          String      @id @default(cuid())
+  type        AnalyticsType
+  date        DateTime
+  roomId      String?
+  userId      String?
+  value       Float
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+
+  @@unique([type, date, roomId, userId])
+  @@map("analytics")
+}
+
+// Enums
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum RoomType {
+  MEETING
+  CONFERENCE
+  PHONE_BOOTH
+  TRAINING
+  EVENT
+  HUDDLE
+}
+
+enum RoomStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RESERVED
+}
+
+enum EquipmentType {
+  PROJECTOR
+  TV
+  WHITEBOARD
+  PHONE
+  CAMERA
+  MICROPHONE
+  SPEAKER
+  COMPUTER
+  OTHER
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  BROKEN
+}
+
+enum SensorType {
+  OCCUPANCY
+  TEMPERATURE
+  HUMIDITY
+  LIGHT
+  NOISE
+  AIR_QUALITY
+  MOTION
+}
+
+enum SensorStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+  MAINTENANCE
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum NotificationType {
+  RESERVATION_CONFIRMED
+  RESERVATION_CANCELLED
+  RESERVATION_REMINDER
+  ROOM_AVAILABLE
+  SYSTEM_MAINTENANCE
+  CUSTOM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum AnalyticsType {
+  ROOM_USAGE
+  USER_ACTIVITY
+  BOOKING_RATE
+  CANCELLATION_RATE
+  NO_SHOW_RATE
+  EFFICIENCY_SCORE
+  OCCUPANCY_RATE
+}
 ```
 
-=== app/core/database.py ===
-```python
-"""
-Database Configuration and Connection Management
-"""
+=== src/config/env.ts ===
+```typescript
+import { z } from 'zod';
 
-import logging
-from typing import AsyncGenerator
+const envSchema = z.object({
+  // Application
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().default(3001),
+  HOST: z.string().default('0.0.0.0'),
+  API_VERSION: z.string().default('v1'),
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+  // Database
+  DATABASE_URL: z.string().url(),
+  DATABASE_POOL_SIZE: z.coerce.number().default(10),
+  DATABASE_TIMEOUT: z.coerce.number().default(30000),
 
-from app.core.config import settings
+  // Redis
+  REDIS_URL: z.string().url(),
+  REDIS_PASSWORD: z.string().optional(),
+  REDIS_DB: z.coerce.number().default(0),
 
-logger = logging.getLogger(__name__)
+  // JWT
+  JWT_SECRET: z.string().min(32),
+  JWT_EXPIRES_IN: z.string().default('24h'),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
-# Create async engine
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
-    poolclass=NullPool if "sqlite" in settings.DATABASE_URL else None,
-    pool_pre_ping=True,
-    pool_recycle=300,
-    pool_size=20,
-    max_overflow=0,
-)
+  // Encryption
+  BCRYPT_ROUNDS: z.coerce.number().default(12),
+  ENCRYPTION_KEY: z.string().length(32),
 
-# Create session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
-    autocommit=False,
-)
+  // Rate Limiting
+  RATE_LIMIT_MAX: z.coerce.number().default(100),
+  RATE_LIMIT_WINDOW: z.coerce.number().default(900000),
 
+  // CORS
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_CREDENTIALS: z.coerce.boolean().default(true),
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Database dependency for FastAPI
-    
-    Yields:
-        AsyncSession: Database session
-    """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Database session error: {e}")
-            raise
-        finally:
-            await session.close()
+  // Email
+  SMTP_HOST: z.string(),
+  SMTP_PORT: z.coerce.number(),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().email(),
+  SMTP_PASS: z.string(),
+  EMAIL_FROM: z.string().email(),
 
+  // AWS
+  AWS_REGION: z.string().default('us-east-1'),
+  AWS_ACCESS_KEY_ID: z.string(),
+  AWS_SECRET_ACCESS_KEY: z.string(),
+  S3_BUCKET_NAME: z.string(),
+  S3_PRESIGNED_URL_EXPIRES: z.coerce.number().default(3600),
 
-async def init_db() -> None:
-    """Initialize database tables"""
-    from app.models.base import Base
-    
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    logger.info("Database tables created successfully")
+  // OAuth
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().url().optional(),
+  MICROSOFT_CLIENT_ID: z.string().optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().optional(),
+  MICROSOFT_CALLBACK_URL: z.string().url().optional(),
 
+  // External APIs
+  GOOGLE_CALENDAR_API_KEY: z.string().optional(),
+  MICROSOFT_GRAPH_API_KEY: z.string().optional(),
+  SLACK_BOT_TOKEN: z.string().optional(),
+  TEAMS_WEBHOOK_URL: z.string().url().optional(),
 
-async def close_db() -> None:
-    """Close database connections"""
-    await engine.dispose()
-    logger.info("Database connections closed")
+  // AI Service
+  AI_SERVICE_URL: z.string().url().optional(),
+  AI_SERVICE_API_KEY: z.string().optional(),
+
+  // IoT
+  IOT_MQTT_BROKER: z.string().url().optional(),
+  IOT_MQTT_USERNAME: z.string().optional(),
+  IOT_MQTT_PASSWORD: z.string().optional(),
+
+  // Monitoring
+  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
+  LOG_FILE_PATH: z.string().default('./logs/app.log'),
+  ENABLE_REQUEST_LOGGING: z.coerce.boolean().default(true),
+
+  // Security
+  HELMET_CSP_ENABLED: z.coerce.boolean().default(true),
+  HELMET_HSTS_ENABLED: z.coerce.boolean().default(true),
+  TRUSTED_PROXIES: z.string().default('127.0.0.1'),
+
+  // Feature Flags
+  ENABLE_AI_RECOMMENDATIONS: z.coerce.boolean().default(true),
+  ENABLE_IOT_INTEGRATION: z.coerce.boolean().default(true),
+  ENABLE_CALENDAR_SYNC: z.coerce.boolean().default(true),
+  ENABLE_NOTIFICATIONS: z.coerce.boolean().default(true),
+  ENABLE_ANALYTICS: z.coerce.boolean().default(true),
+
+  // Background Jobs
+  QUEUE_REDIS_URL: z.string().url(),
+  QUEUE_CONCURRENCY: z.coerce.number().default(5),
+  QUEUE_RETRY_ATTEMPTS: z.coerce.number().default(3),
+  QUEUE_RETRY_DELAY: z.coerce.number().default(5000),
+
+  // File Upload
+  MAX_FILE_SIZE: z.coerce.number().default(10485760),
+  ALLOWED_FILE_TYPES: z.string().default('image/jpeg,image/png,image/gif,application/pdf'),
+  UPLOAD_PATH: z.string().default('./uploads'),
+
+  // Cache
+  CACHE_TTL: z.coerce.number().default(3600),
+  CACHE_MAX_KEYS: z.coerce.number().default(1000),
+
+  // Health Check
+  HEALTH_CHECK_TIMEOUT: z.coerce.number().default(5000),
+  HEALTH_CHECK_INTERVAL: z.coerce.number().default(30000),
+});
+
+export type EnvConfig = z.infer<typeof envSchema>;
+
+let env: EnvConfig;
+
+try {
+  env = envSchema.parse(process.env);
+} catch (error) {
+  console.error('❌ Invalid environment variables:', error);
+  process.exit(1);
+}
+
+export { env };
 ```
 
-=== app/core/security.py ===
-```python
-"""
-Security Utilities and Middleware
-"""
+=== src/config/database.ts ===
+```typescript
+import { PrismaClient } from '@prisma/client';
+import { env } from './env';
+import { logger } from '@/utils/logger';
 
-import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Union
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
-import bcrypt
-from fastapi import HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  datasources: {
+    db: {
+      url: env.DATABASE_URL,
+    },
+  },
+});
 
-from app.core.config import settings
+if (env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
 
-logger = logging.getLogger(__name__)
+// Database connection health check
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error) {
+    logger.error('Database connection failed:', error);
+    return false;
+  }
+}
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+// Graceful shutdown
+export async function disconnectDatabase(): Promise<void> {
+  try {
+    await prisma.$disconnect();
+    logger.info('Database disconnected successfully');
+  } catch (error) {
+    logger.error('Error disconnecting from database:', error);
+  }
+}
 
-# JWT Bearer
-security = HTTPBearer(auto_error=False)
-
-
-class SecurityHeaders(BaseHTTPMiddleware):
-    """Security headers middleware"""
-    
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        
-        # Security headers
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        
-        if not settings.DEBUG:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        
-        return response
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a password against its hash
-    
-    Args:
-        plain_password: Plain text password
-        hashed_password: Hashed password
-        
-    Returns:
-        bool: True if password matches
-    """
-    try:
-        return pwd_context.verify(plain_password, hashed_password)
-    except Exception as e:
-        logger.error(f"Password verification error: {e}")
-        return False
-
-
-def get_password_hash(password: str) -> str:
-    """
-    Hash a password
-    
-    Args:
-        password: Plain text password
-        
-    Returns:
-        str: Hashed password
-    """
-    try:
-        return pwd_context.hash(password)
-    except Exception as e:
-        logger.error(f"Password hashing error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Password hashing failed"
-        )
-
-
-def validate_password_strength(password: str) -> bool:
-    """
-    Validate password strength
-    
-    Args:
-        password: Password to validate
-        
-    Returns:
-        bool: True if password is strong enough
-    """
-    if len(password) < settings.PASSWORD_MIN_LENGTH:
-        return False
-    
-    # Check for at least one uppercase, lowercase, digit, and special character
-    has_upper = any(c.isupper() for c in password)
-    has_lower = any(c.islower() for c in password)
-    has_digit = any(c.isdigit() for c in password)
-    has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
-    
-    return all([has_upper, has_lower, has_digit, has_special])
-
-
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Create JWT access token
-    
-    Args:
-        data: Token payload data
-        expires_delta: Token expiration time
-        
-    Returns:
-        str: JWT token
-    """
-    to_encode = data.copy()
-    
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire, "type": "access"})
-    
-    try:
-        encoded_jwt = jwt.encode(
-            to_encode,
-            settings.JWT_SECRET_KEY,
-            algorithm=settings.JWT_ALGORITHM
-        )
-        return encoded_jwt
-    except Exception as e:
-        logger.error(f"Token creation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token creation failed"
-        )
-
-
-def create_refresh_token(data: Dict[str, Any]) -> str:
-    """
-    Create JWT refresh token
-    
-    Args:
-        data: Token payload data
-        
-    Returns:
-        str: JWT refresh token
-    """
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
-    
-    try:
-        encoded_jwt = jwt.encode(
-            to_encode,
-            settings.JWT_SECRET_KEY,
-            algorithm=settings.JWT_ALGORITHM
-        )
-        return encoded_jwt
-    except Exception as e:
-        logger.error(f"Refresh token creation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Refresh token creation failed"
-        )
-
-
-def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
-    """
-    Verify and decode JWT token
-    
-    Args:
-        token: JWT token to verify
-        token_type: Expected token type (access/refresh)
-        
-    Returns:
-        Dict[str, Any]: Token payload
-        
-    Raises:
-        HTTPException: If token is invalid
-    """
-    try:
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM]
-        )
-        
-        # Verify token type
-        if payload.get("type") != token_type:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid token type. Expected {token_type}",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Check expiration
-        exp = payload.get("exp")
-        if exp is None or datetime.utcnow() > datetime.fromtimestamp(exp):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has expired",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        return payload
-        
-    except JWTError as e:
-        logger.warning(f"JWT verification failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except Exception as e:
-        logger.error(f"Token verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token verification failed"
-        )
-
-
-def generate_secure_token(length: int = 32) -> str:
-    """
-    Generate a secure random token
-    
-    Args:
-        length: Token length
-        
-    Returns:
-        str: Secure random token
-    """
-    import secrets
-    return secrets.token_urlsafe(length)
-
-
-def hash_api_key(api_key: str) -> str:
-    """
-    Hash API key for storage
-    
-    Args:
-        api_key: API key to hash
-        
-    Returns:
-        str: Hashed API key
-    """
-    return bcrypt.hashpw(api_key.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-
-def verify_api_key(api_key: str, hashed_key: str) -> bool:
-    """
-    Verify API key against hash
-    
-    Args:
-        api_key: Plain API key
-        hashed_key: Hashed API key
-        
-    Returns:
-        bool: True if API key matches
-    """
-    try:
-        return bcrypt.checkpw(api_key.encode('utf-8'), hashed_key.encode('utf-8'))
-    except Exception as e:
-        logger.error(f"API key verification error: {e}")
-        return False
+// Database middleware for logging
+prisma.$use(async (params, next) => {
+  const before = Date.now();
+  const result = await next(params);
+  const after = Date.now();
+  
+  if (env.NODE_ENV === 'development') {
+    logger.debug(`Query ${params.model}.${params.action} took ${after - before}ms`);
+  }
+  
+  return result;
+});
 ```
 
-=== app/core/exceptions.py ===
-```python
-"""
-Custom Exception Classes and Handlers
-"""
+=== src/config/redis.ts ===
+```typescript
+import Redis from 'ioredis';
+import { env } from './env';
+import { logger } from '@/utils/logger';
 
-import logging
-from typing import Any, Dict, Optional
+class RedisClient {
+  private client: Redis;
+  private isConnected = false;
 
-from fastapi import HTTPException, Request, status
-from fastapi.responses import JSONResponse
-from pydantic import ValidationError
+  constructor() {
+    this.client = new Redis(env.REDIS_URL, {
+      password: env.REDIS_PASSWORD,
+      db: env.REDIS_DB,
+      retryDelayOnFailover: 100,
+      maxRetriesPerRequest: 3,
+      lazyConnect: true,
+      keepAlive: 30000,
+      connectTimeout: 10000,
+      commandTimeout: 5000,
+    });
 
-logger = logging.getLogger(__name__)
+    this.setupEventHandlers();
+  }
 
+  private setupEventHandlers(): void {
+    this.client.on('connect', () => {
+      this.isConnected = true;
+      logger.info('Redis connected successfully');
+    });
 
-class CustomHTTPException(HTTPException):
-    """Custom HTTP Exception with additional context"""
-    
-    def __init__(
-        self,
-        status_code: int,
-        detail: str,
-        headers: Optional[Dict[str, Any]] = None,
-        error_code: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ):
-        super().__init__(status_code=status_code, detail=detail, headers=headers)
-        self.error_code = error_code
-        self.context = context or {}
+    this.client.on('ready', () => {
+      logger.info('Redis is ready to receive commands');
+    });
 
+    this.client.on('error', (error) => {
+      this.isConnected = false;
+      logger.error('Redis connection error:', error);
+    });
 
-class ValidationException(Exception):
-    """Custom validation exception"""
-    
-    def __init__(self, message: str, field: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
-        self.message = message
-        self.field = field
-        self.context = context or {}
-        super().__init__(self.message)
+    this.client.on('close', () => {
+      this.isConnected = false;
+      logger.warn('Redis connection closed');
+    });
 
+    this.client.on('reconnecting', () => {
+      logger.info('Redis reconnecting...');
+    });
+  }
 
-class AuthenticationException(CustomHTTPException):
-    """Authentication related exceptions"""
-    
-    def __init__(self, detail: str = "Authentication failed", error_code: str = "AUTH_FAILED"):
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-            headers={"WWW-Authenticate": "Bearer"},
-            error_code=error_code,
-        )
-
-
-class AuthorizationException(CustomHTTPException):
-    """Authorization related exceptions"""
-    
-    def __init__(self, detail: str = "Access denied", error_code: str = "ACCESS_DENIED"):
-        super().__init__(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=detail,
-            error_code=error_code,
-        )
-
-
-class NotFoundException(CustomHTTPException):
-    """Resource not found exceptions"""
-    
-    def __init__(self, detail: str = "Resource not found", error_code: str = "NOT_FOUND"):
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=detail,
-            error_code=error_code,
-        )
-
-
-class ConflictException(CustomHTTPException):
-    """Resource conflict exceptions"""
-    
-    def __init__(self, detail: str = "Resource conflict", error_code: str = "CONFLICT"):
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=detail,
-            error_code=error_code,
-        )
-
-
-class RateLimitException(CustomHTTPException):
-    """Rate limit exceeded exceptions"""
-    
-    def __init__(self, detail: str = "Rate limit exceeded", error_code: str = "RATE_LIMIT_EXCEEDED"):
-        super().__init__(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=detail,
-            error_code=error_code,
-        )
-
-
-class DatabaseException(CustomHTTPException):
-    """Database related exceptions"""
-    
-    def __init__(self, detail: str = "Database error", error_code: str = "DATABASE_ERROR"):
-        super().__init__(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=detail,
-            error_code=error_code,
-        )
-
-
-class ExternalServiceException(CustomHTTPException):
-    """External service related exceptions"""
-    
-    def __init__(self, detail: str = "External service error", error_code: str = "EXTERNAL_SERVICE_ERROR"):
-        super().__init__(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=detail,
-            error_code=error_code,
-        )
-
-
-async def custom_http_exception_handler(request: Request, exc: CustomHTTPException) -> JSONResponse:
-    """
-    Custom HTTP exception handler
-    
-    Args:
-        request: FastAPI request object
-        exc: Custom HTTP exception
-        
-    Returns:
-        JSONResponse: Error response
-    """
-    logger.error(
-        f"Custom HTTP Exception: {exc.status_code} - {exc.detail} "
-        f"- Path: {request.url.path} - Method: {request.method}"
-    )
-    
-    error_response = {
-        "success": False,
-        "error": {
-            "code": exc.error_code or "HTTP_ERROR",
-            "message": exc.detail,
-            "status_code": exc.status_code,
-        },
-        "timestamp": str(datetime.utcnow().isoformat()),
-        "path": str(request.url.path),
-        "method": request.method,
+  async connect(): Promise<void> {
+    try {
+      await this.client.connect();
+    } catch (error) {
+      logger.error('Failed to connect to Redis:', error);
+      throw error;
     }
-    
-    # Add context if available
-    if exc.context:
-        error_response["error"]["context"] = exc.context
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=error_response,
-        headers=exc.headers,
-    )
+  }
 
-
-async def validation_exception_handler(request: Request, exc: ValidationException) -> JSONResponse:
-    """
-    Validation exception handler
-    
-    Args:
-        request: FastAPI request object
-        exc: Validation exception
-        
-    Returns:
-        JSONResponse: Error response
-    """
-    logger.warning(
-        f"Validation Exception: {exc.message} "
-        f"- Field: {exc.field} - Path: {request.url.path}"
-    )
-    
-    error_response = {
-        "success": False,
-        "error": {
-            "code": "VALIDATION_ERROR",
-            "message": exc.message,
-            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY,
-        },
-        "timestamp": str(datetime.utcnow().isoformat()),
-        "path": str(request.url.path),
-        "method": request.method,
+  async disconnect(): Promise<void> {
+    try {
+      await this.client.disconnect();
+      this.isConnected = false;
+      logger.info('Redis disconnected successfully');
+    } catch (error) {
+      logger.error('Error disconnecting from Redis:', error);
     }
-    
-    # Add field if available
-    if exc.field:
-        error_response["error"]["field"] = exc.field
-    
-    # Add context if available
-    if exc.context:
-        error_response["error"]["context"] = exc.context
-    
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error_response,
-    )
+  }
 
+  getClient(): Redis {
+    return this.client;
+  }
 
-async def pydantic_validation_exception_handler(request: Request, exc: ValidationError) -> JSONResponse:
-    """
-    Pydantic validation exception handler
-    
-    Args:
-        request: FastAPI request object
-        exc: Pydantic validation error
-        
-    Returns:
-        JSONResponse: Error response
-    """
-    logger.warning(f"Pydantic Validation Error: {exc} - Path: {request.url.path}")
-    
-    # Format validation errors
-    errors = []
-    for error in exc.errors():
-        field_path = " -> ".join(str(loc) for loc in error["loc"])
-        errors.append({
-            "field": field_path,
-            "message": error["msg"],
-            "type": error["type"],
-            "input": error.get("input"),
-        })
-    
-    error_response = {
-        "success": False,
-        "error": {
-            "code": "VALIDATION_ERROR",
-            "message": "Validation failed",
-            "status_code": status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "details": errors,
-        },
-        "timestamp": str(datetime.utcnow().isoformat()),
-        "path": str(request.url.path),
-        "method": request.method,
+  isHealthy(): boolean {
+    return this.isConnected && this.client.status === 'ready';
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      const result = await this.client.ping();
+      return result === 'PONG';
+    } catch (error) {
+      logger.error('Redis health check failed:', error);
+      return false;
     }
-    
-    return JSONResponse(
-        status
+  }
+
+  // Cache methods
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.client.get(key);
+    } catch (error) {
+      logger.error(`Redis GET error for key ${key}:`, error);
+      return null;
+    }
+  }
+
+  async set(key: string, value: string, ttl?: number): Promise<boolean> {
+    try {
+      if (ttl) {
+        await this.client.setex(key, ttl, value);
+      } else {
+        await this.client.set(key, value);
+      }
+      return true;
+    } catch (error) {
+      logger.error(`Redis SET error for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  async del(key: string): Promise<boolean> {
+    try {
+      const result = await this.client.del(key);
+      return result > 0;
+    } catch (error) {
+      logger.error(`Redis DEL error for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  async exists(key: string): Promise<boolean> {
+    try {
+      const result = await this.client.exists(key);
+      return result === 1;
+    } catch (error) {
+      logger.error(`Redis EXISTS error for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  async expire(key: string, seconds: number): Promise<boolean> {
+    try {
+      const result = await this.client.expire(key, seconds);
+      return result === 1;
+    } catch (error) {
+      logger.error(`Redis EXPIRE error for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    try {
+      return await this.client.hget(key, field);
+    } catch (error) {
+      logger.error(`Redis HGET error for key ${key}, field ${field}:`, error);
+      return null;
+    }
+  }
+
+  async hset(key: string, field: string, value: string): Promise<boolean> {
+    try {
+      await this.client.hset(key, field, value);
+      return true;
+    } catch (error) {
+      logger.error(`Redis HSET error for key ${key}, field ${field}:`, error);
+      return false;
+    }
+  }
+
+  async hdel(key: string, field: string): Promise<boolean> {
+    try {
+      const result = await this.client.hdel(key, field);
+      return result > 0;
+    } catch (error) {
+      logger.error(`Redis HDEL error for key ${key}, field ${field}:`, error);
+      return false;
+    }
+  }
+
+  async sadd(key: string, member: string): Promise<boolean> {
+    try {
+      const result = await this.client.sadd(key, member);
+      return result > 0;
+    } catch (error) {
+      logger.error(`Redis SADD error for key ${key}, member ${member}:`, error);
+      return false;
+    }
+  }
+
+  async srem(key: string, member: string): Promise<boolean> {
+    try {
+      const result = await this.client.srem(key, member);
+      return result > 0;
+    } catch (error) {
+      logger.error(`Redis SREM error for key ${key}, member ${member}:`, error);
+      return false;
+    }
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    try {
+      return await this.client.smembers(key);
+    } catch (error) {
+      logger.error(`Redis SMEMBERS error for key ${key}:`, error);
+      return [];
+    }
+  }
+}
+
+export const redis = new RedisClient();
+```
+
+=== src/config/logger.ts ===
+```typescript
+import winston from 'winston';
+import { env } from './env';
+
+const logFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.errors({ stack: true }),

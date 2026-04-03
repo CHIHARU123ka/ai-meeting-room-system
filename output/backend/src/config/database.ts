@@ -1,83 +1,38 @@
 import { PrismaClient } from '@prisma/client';
-import { env, isDevelopment } from './environment';
-import { logger } from '@/utils/logger';
+import { logger } from './logger';
 
-const prisma = new PrismaClient({
-  log: isDevelopment 
-    ? ['query', 'info', 'warn', 'error']
-    : ['warn', 'error'],
-  errorFormat: isDevelopment ? 'pretty' : 'minimal',
-});
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
-// Database connection event handlers
-prisma.$on('query', (e) => {
-  if (isDevelopment) {
-    logger.debug('Database Query', {
-      query: e.query,
-      params: e.params,
-      duration: `${e.duration}ms`,
-    });
-  }
-});
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env['NODE_ENV'] === 'development'
+        ? [
+            { level: 'query', emit: 'event' },
+            { level: 'error', emit: 'stdout' },
+            { level: 'warn', emit: 'stdout' },
+          ]
+        : [{ level: 'error', emit: 'stdout' }],
+  });
 
-prisma.$on('info', (e) => {
-  logger.info('Database Info', { message: e.message });
-});
+if (process.env['NODE_ENV'] !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
 
-prisma.$on('warn', (e) => {
-  logger.warn('Database Warning', { message: e.message });
-});
-
-prisma.$on('error', (e) => {
-  logger.error('Database Error', { message: e.message });
-});
-
-// Graceful shutdown
-process.on('beforeExit', async () => {
-  logger.info('Disconnecting from database...');
-  await prisma.$disconnect();
-});
-
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT, disconnecting from database...');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  logger.info('Received SIGTERM, disconnecting from database...');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-export { prisma };
-
-export const connectDatabase = async (): Promise<void> => {
-  try {
-    await prisma.$connect();
-    logger.info('✅ Database connected successfully');
-  } catch (error) {
-    logger.error('❌ Database connection failed', { error });
-    throw error;
-  }
-};
-
-export const disconnectDatabase = async (): Promise<void> => {
-  try {
-    await prisma.$disconnect();
-    logger.info('✅ Database disconnected successfully');
-  } catch (error) {
-    logger.error('❌ Database disconnection failed', { error });
-    throw error;
-  }
-};
-
-export const checkDatabaseHealth = async (): Promise<boolean> => {
+export async function checkDatabaseConnection(): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch (error) {
-    logger.error('Database health check failed', { error });
+    logger.error('Database connection check failed', { error });
     return false;
   }
-};
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  await prisma.$disconnect();
+  logger.info('Database disconnected');
+}
+
+export default prisma;
